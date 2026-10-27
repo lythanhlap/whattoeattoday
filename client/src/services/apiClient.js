@@ -176,7 +176,6 @@ export async function uploadImageToCloudinary(file, accessToken, purpose = 'cook
   formData.append('public_id', upload.publicId);
   formData.append('signature', upload.signature);
   formData.append('allowed_formats', upload.allowedFormats);
-  formData.append('max_file_size', String(upload.maxFileSize));
   const response = await fetch(`https://api.cloudinary.com/v1_1/${upload.cloudName}/${upload.resourceType}/upload`, { method: 'POST', body: formData });
   const result = await response.json().catch(() => null);
   if (!response.ok || !result?.secure_url) throw new ApiError(result?.error?.message || 'Không thể upload ảnh', response.status, 'MEDIA_UPLOAD_FAILED');

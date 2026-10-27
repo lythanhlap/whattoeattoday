@@ -20,7 +20,7 @@ export async function createUploadSignature(userId, purpose = 'cooksnap') {
   const publicId = crypto.randomUUID();
   const fullPublicId = `${folder}/${publicId}`;
   const allowedFormats = 'jpg,png,jpeg,webp';
-  const toSign = `allowed_formats=${allowedFormats}&folder=${folder}&max_file_size=${env.cloudinaryMaxFileSize}&public_id=${publicId}&timestamp=${timestamp}`;
+  const toSign = `allowed_formats=${allowedFormats}&folder=${folder}&public_id=${publicId}&timestamp=${timestamp}`;
   const signature = crypto.createHash('sha1').update(`${toSign}${env.cloudinaryApiSecret}`).digest('hex');
   const asset = await prisma.mediaAsset.create({ data: { ownerId: userId, providerPublicId: fullPublicId } });
   return { cloudName: env.cloudinaryCloudName, apiKey: env.cloudinaryApiKey, timestamp, folder, publicId, mediaAssetId: asset.id, signature, resourceType: 'image', allowedFormats, maxFileSize: env.cloudinaryMaxFileSize };

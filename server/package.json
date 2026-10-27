@@ -9,6 +9,7 @@
     "lint": "eslint .",
     "test": "node --env-file=.env.example --env-file=test.env --test",
     "test:redis": "node --env-file=.env.example --env-file=test.redis.env --test test/redis.integration.test.js",
+    "test:cloudinary": "node --env-file=.env --test test/cloudinary.integration.test.js",
     "prisma:generate": "prisma generate",
     "prisma:validate": "prisma validate",
     "prisma:migrate": "prisma migrate dev",
