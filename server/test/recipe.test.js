@@ -3,7 +3,7 @@ import test, { after } from 'node:test';
 import request from 'supertest';
 import { createApp } from '../src/app.js';
 import { prisma } from '../src/lib/prisma.js';
-import { registerUploadedAsset } from '../src/services/mediaService.js';
+import { cleanupOrphanMediaAssets, registerUploadedAsset } from '../src/services/mediaService.js';
 
 const app = createApp();
 const suffix = Date.now().toString().slice(-8);
@@ -416,6 +416,42 @@ test('Cloudinary provider verification works with a fetch stub', async () => {  
     assert.equal(registered.secureUrl, 'https://res.cloudinary.com/replace-with-cloud-name/image/upload/stub.jpg');
     assert.equal(registered.bytes, 1024);
   } finally { globalThis.fetch = originalFetch; }
+});
+
+test('cleanup removes detached attached assets and keeps referenced ones', async () => {
+  const owner = await createUser('cleanup');
+  const old = new Date(Date.now() - 48 * 60 * 60 * 1000);
+  const detached = await prisma.mediaAsset.create({
+    data: { ownerId: owner.id, providerPublicId: `test/${owner.id}/cleanup-detached`, secureUrl: 'https://res.cloudinary.com/demo/image/upload/cleanup-detached.jpg', status: 'ATTACHED', attachedAt: new Date(), createdAt: old },
+  });
+  const referenced = await prisma.mediaAsset.create({
+    data: { ownerId: owner.id, providerPublicId: `test/${owner.id}/cleanup-referenced`, secureUrl: 'https://res.cloudinary.com/demo/image/upload/cleanup-referenced.jpg', status: 'ATTACHED', attachedAt: new Date(), createdAt: old },
+  });
+  const recipe = await prisma.recipe.create({
+    data: {
+      authorId: owner.id,
+      title: 'Cleanup fixture',
+      slug: `cleanup-fixture-${suffix}`,
+      coverImageId: referenced.id,
+      ingredients: { create: [{ displayName: 'Rau', sortOrder: 0 }] },
+      steps: { create: [{ instruction: 'Nấu chín.', stepNumber: 1 }] },
+    },
+  });
+
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = async () => new Response(JSON.stringify({ result: 'ok' }), { status: 200, headers: { 'content-type': 'application/json' } });
+  try {
+    await cleanupOrphanMediaAssets({ olderThanHours: 24 });
+    const detachedState = await prisma.mediaAsset.findUnique({ where: { id: detached.id }, select: { status: true, deletedAt: true } });
+    assert.equal(detachedState.status, 'DELETED');
+    assert.ok(detachedState.deletedAt);
+    const referencedState = await prisma.mediaAsset.findUnique({ where: { id: referenced.id }, select: { status: true } });
+    assert.equal(referencedState.status, 'ATTACHED');
+  } finally {
+    globalThis.fetch = originalFetch;
+    await prisma.recipe.delete({ where: { id: recipe.id } });
+    await prisma.mediaAsset.deleteMany({ where: { id: { in: [detached.id, referenced.id] } } });
+  }
 });
 
 test('user can list notifications and mark them read', async () => {

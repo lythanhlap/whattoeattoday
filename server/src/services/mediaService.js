@@ -58,10 +58,38 @@ export async function registerUploadedAsset(ownerId, input) {
 export async function cleanupOrphanMediaAssets({ olderThanHours = 24, limit = 100 } = {}) {
   validateCloudinaryConfig();
   const cutoff = new Date(Date.now() - olderThanHours * 60 * 60 * 1000);
-  const assets = await prisma.mediaAsset.findMany({ where: { status: 'UPLOADED', attachedAt: null, createdAt: { lt: cutoff } }, take: Math.min(limit, 500), orderBy: { createdAt: 'asc' } });
+  const assets = await prisma.mediaAsset.findMany({
+    where: {
+      createdAt: { lt: cutoff },
+      OR: [
+        { status: 'UPLOADED', attachedAt: null },
+        {
+          status: 'ATTACHED',
+          cookSnap: null,
+          recipeCovers: { none: {} },
+          recipeImages: { none: {} },
+          collectionCovers: { none: {} },
+        },
+      ],
+    },
+    take: Math.min(limit, 500),
+    orderBy: { createdAt: 'asc' },
+  });
   let deleted = 0;
   for (const asset of assets) {
-    const claimed = await prisma.mediaAsset.updateMany({ where: { id: asset.id, status: 'UPLOADED', attachedAt: null }, data: { status: 'CLEANING' } });
+    const claimed = await prisma.mediaAsset.updateMany({
+      where: asset.status === 'UPLOADED'
+        ? { id: asset.id, status: 'UPLOADED', attachedAt: null }
+        : {
+          id: asset.id,
+          status: 'ATTACHED',
+          cookSnap: null,
+          recipeCovers: { none: {} },
+          recipeImages: { none: {} },
+          collectionCovers: { none: {} },
+        },
+      data: { status: 'CLEANING' },
+    });
     if (!claimed.count) continue;
     const timestamp = Math.floor(Date.now() / 1000);
     const toSign = `public_id=${asset.providerPublicId}&timestamp=${timestamp}`;
@@ -72,7 +100,7 @@ export async function cleanupOrphanMediaAssets({ olderThanHours = 24, limit = 10
     if (response.ok && ['ok', 'not found'].includes(result?.result)) {
       await prisma.mediaAsset.update({ where: { id: asset.id }, data: { status: 'DELETED', deletedAt: new Date() } });
       deleted += 1;
-    } else await prisma.mediaAsset.updateMany({ where: { id: asset.id, status: 'CLEANING' }, data: { status: 'UPLOADED' } });
+    } else await prisma.mediaAsset.updateMany({ where: { id: asset.id, status: 'CLEANING' }, data: { status: asset.status } });
   }
   return { scanned: assets.length, deleted };
 }
