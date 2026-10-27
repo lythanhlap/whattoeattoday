@@ -20,10 +20,11 @@ npm-debug.log*
 server/prisma/dev.db
 
 # Internal planning and specification documents (kept local, not part of the product)
+README.md
 PROJECT_PROGRESS*.md
 BUSINESS_REQUIREMENTS.md
 VIBECODING.md
-
+README.md
 # Editor and OS metadata
 .vscode/
 .idea/
