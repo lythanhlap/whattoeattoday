@@ -5,11 +5,15 @@ export function notFoundHandler(request, _response, next) {
   next(error);
 }
 
-export function errorHandler(error, _request, response, next) {
+export function errorHandler(error, request, response, next) {
   const statusCode = error.statusCode || 500;
   const isServerError = statusCode >= 500;
 
   void next;
+
+  if (isServerError) {
+    console.error(`[server-error] ${request.method} ${request.originalUrl}`, error);
+  }
 
   response.status(statusCode).json({
     data: null,
