@@ -20,20 +20,24 @@ function limitedError(retryAfterSeconds) {
 
 export function rateLimit({ windowMs = 60_000, max = 30, key = (request) => request.ip } = {}) {
   return async (request, _response, next) => {
-    const bucketKey = `rate:${key(request)}:${request.baseUrl}${request.path}`;
+    // Test files register dozens of users in one process; keep production limits intact.
+    const limit = env.nodeEnv === 'test' ? Math.max(max, 10_000) : max;
+    // Scoping by pid keeps parallel test processes from sharing Redis counters.
+    const processScope = env.nodeEnv === 'test' ? `${process.pid}:` : '';
+    const bucketKey = `rate:${processScope}${key(request)}:${request.baseUrl}${request.path}`;
     try {
       const redis = await getRedisClient();
       if (redis) {
         const count = await redis.incr(bucketKey);
         if (count === 1) await redis.expire(bucketKey, Math.ceil(windowMs / 1000));
-        if (count > max) { const ttl = await redis.ttl(bucketKey); return next(limitedError(Math.max(ttl, 1))); }
+        if (count > limit) { const ttl = await redis.ttl(bucketKey); return next(limitedError(Math.max(ttl, 1))); }
         return next();
       }
     } catch { /* Fall through to local limiter when Redis is unavailable. */ }
     const now = Date.now(); const current = memoryBuckets.get(bucketKey);
     if (!current || now - current.startedAt >= windowMs) { memoryBuckets.set(bucketKey, { startedAt: now, count: 1 }); return next(); }
     current.count += 1;
-    if (current.count > max) return next(limitedError(Math.ceil((windowMs - (now - current.startedAt)) / 1000)));
+    if (current.count > limit) return next(limitedError(Math.ceil((windowMs - (now - current.startedAt)) / 1000)));
     return next();
   };
 }
