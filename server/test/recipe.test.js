@@ -356,3 +356,34 @@ test('user can list notifications and mark them read', async () => {
   assert.equal(allRead.status, 204);
   await prisma.notification.deleteMany({ where: { userId: { in: [user.id, admin.id] } } });
 });
+
+test('search ranks title matches before ingredient and description matches', async () => {
+  const author = await createUser('rank');
+  const token = `zzrank${suffix}`;
+  async function publish(payload) {
+    const created = await request(app).post('/api/v1/recipes').set('Authorization', `Bearer ${author.token}`).send({
+      ingredients: [{ displayName: 'Rau cải' }],
+      steps: [{ instruction: 'Nấu chín.' }],
+      ...payload,
+    });
+    assert.equal(created.status, 201);
+    return created.body.data.recipe.id;
+  }
+
+  const titleMatch = await publish({ title: `Món ${token} đặc biệt`, description: 'Công thức kiểm thử xếp hạng.' });
+  await prisma.recipe.update({ where: { id: titleMatch }, data: { status: 'PUBLISHED', visibility: 'PUBLIC', publishedAt: new Date(Date.now() - 3 * 60 * 60 * 1000) } });
+  const ingredientMatch = await publish({ title: 'Món xào rau củ', description: 'Công thức kiểm thử xếp hạng.', ingredients: [{ displayName: `${token} tươi` }] });
+  await prisma.recipe.update({ where: { id: ingredientMatch }, data: { status: 'PUBLISHED', visibility: 'PUBLIC', publishedAt: new Date(Date.now() - 2 * 60 * 60 * 1000) } });
+  const descriptionMatch = await publish({ title: 'Món canh chua', description: `Hướng dẫn nấu món ${token} chuẩn vị.` });
+  await prisma.recipe.update({ where: { id: descriptionMatch }, data: { status: 'PUBLISHED', visibility: 'PUBLIC', publishedAt: new Date(Date.now() - 60 * 60 * 1000) } });
+
+  const searched = await request(app).get('/api/v1/recipes').query({ q: token, limit: 10 });
+  assert.equal(searched.status, 200);
+  const orderedIds = searched.body.data.map((recipe) => recipe.id).filter((id) => [titleMatch, ingredientMatch, descriptionMatch].includes(id));
+  assert.deepEqual(orderedIds, [titleMatch, ingredientMatch, descriptionMatch]);
+  assert.ok(searched.body.meta.total >= 3);
+
+  const secondPage = await request(app).get('/api/v1/recipes').query({ q: token, limit: 2, page: 2 });
+  assert.equal(secondPage.status, 200);
+  assert.equal(secondPage.body.data.length >= 1, true);
+});

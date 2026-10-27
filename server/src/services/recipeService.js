@@ -13,30 +13,114 @@ const recipeInclude = {
 
 const DIET_TAG_SLUGS = new Set(['mon-chay', 'thuan-chay', 'eat-clean', 'khong-gluten', 'khong-sua']);
 
-async function findSearchIds(query, ingredient) {
-  if (!query?.trim() && !ingredient?.trim()) return null;
-  const normalizedQuery = query?.trim() || '';
-  const normalizedIngredient = ingredient?.trim() || '';
-  const rows = await prisma.$queryRaw(Prisma.sql`
-    SELECT DISTINCT r.id
-    FROM recipes r
-    LEFT JOIN recipe_ingredients ri ON ri."recipeId" = r.id
-    LEFT JOIN recipe_tags rt ON rt."recipeId" = r.id
-    LEFT JOIN tags t ON t.id = rt."tagId"
-    LEFT JOIN categories c ON c.id = r."categoryId"
-    WHERE (
-      ${normalizedQuery} = ''
-      OR to_tsvector('simple', immutable_unaccent(coalesce(r.title, '') || ' ' || coalesce(r.description, ''))) @@ plainto_tsquery('simple', immutable_unaccent(${normalizedQuery}))
-      OR immutable_unaccent(r.title) % immutable_unaccent(${normalizedQuery})
-      OR immutable_unaccent(coalesce(t.name, '')) % immutable_unaccent(${normalizedQuery})
-      OR immutable_unaccent(coalesce(c.name, '')) % immutable_unaccent(${normalizedQuery})
+function searchConditions({ query, ingredient }) {
+  return Prisma.sql`
+    (
+      ${query} = ''
+      OR to_tsvector('simple', immutable_unaccent(coalesce(r.title, '') || ' ' || coalesce(r.description, ''))) @@ plainto_tsquery('simple', immutable_unaccent(${query}))
+      OR immutable_unaccent(r.title) % immutable_unaccent(${query})
+      OR immutable_unaccent(r.title) ILIKE '%' || immutable_unaccent(${query}) || '%'
+      OR EXISTS (
+        SELECT 1 FROM recipe_ingredients ri
+        WHERE ri."recipeId" = r.id
+          AND (immutable_unaccent(ri."displayName") % immutable_unaccent(${query})
+            OR immutable_unaccent(ri."displayName") ILIKE '%' || immutable_unaccent(${query}) || '%')
+      )
+      OR EXISTS (
+        SELECT 1 FROM recipe_tags rt JOIN tags t ON t.id = rt."tagId"
+        WHERE rt."recipeId" = r.id AND immutable_unaccent(t.name) % immutable_unaccent(${query})
+      )
+      OR EXISTS (
+        SELECT 1 FROM categories c
+        WHERE c.id = r."categoryId" AND immutable_unaccent(c.name) % immutable_unaccent(${query})
+      )
     )
     AND (
-      ${normalizedIngredient} = ''
-      OR immutable_unaccent(ri."displayName") % immutable_unaccent(${normalizedIngredient})
+      ${ingredient} = ''
+      OR EXISTS (
+        SELECT 1 FROM recipe_ingredients ri
+        WHERE ri."recipeId" = r.id
+          AND (immutable_unaccent(ri."displayName") % immutable_unaccent(${ingredient})
+            OR immutable_unaccent(ri."displayName") ILIKE '%' || immutable_unaccent(${ingredient}) || '%')
+      )
     )
+  `;
+}
+
+function searchFilters({ categoryId, tags = [], diet, maxCookTime, hasCooksnap, featured }) {
+  const tagList = tags.length ? tags : null;
+  return Prisma.sql`
+    AND (${categoryId || null}::uuid IS NULL OR r."categoryId" = ${categoryId || null}::uuid)
+    AND (${tagList}::text[] IS NULL OR EXISTS (
+      SELECT 1 FROM recipe_tags rt JOIN tags t ON t.id = rt."tagId"
+      WHERE rt."recipeId" = r.id AND t.slug = ANY(${tagList}::text[])
+    ))
+    AND (${diet || null}::text IS NULL
+      OR EXISTS (
+        SELECT 1 FROM recipe_tags rt JOIN tags t ON t.id = rt."tagId"
+        WHERE rt."recipeId" = r.id AND t.slug = ${diet || null}
+      )
+      OR EXISTS (
+        SELECT 1 FROM categories c WHERE c.id = r."categoryId" AND c.slug = ${diet || null}
+      ))
+    AND (${maxCookTime ?? null}::int IS NULL OR coalesce(r."cookTimeMinutes", 2147483647) <= ${maxCookTime ?? null}::int)
+    AND (${featured} = false OR r."featuredAt" IS NOT NULL)
+    AND (${hasCooksnap} = false OR EXISTS (
+      SELECT 1 FROM cooksnaps cs
+      WHERE cs."recipeId" = r.id AND cs.status = 'ACTIVE' AND cs."deletedAt" IS NULL
+    ))
+  `;
+}
+
+function searchOrder(sort) {
+  if (sort === 'popular') return Prisma.sql`r."saveCount" DESC, r."cookSnapCount" DESC, r."publishedAt" DESC NULLS LAST, r."createdAt" DESC`;
+  if (sort === 'cooksnaps') return Prisma.sql`r."cookSnapCount" DESC, r."publishedAt" DESC NULLS LAST, r."createdAt" DESC`;
+  return Prisma.sql`title_hit DESC, ingredient_hit DESC, text_rank DESC, r."publishedAt" DESC NULLS LAST, r."createdAt" DESC, r."saveCount" DESC`;
+}
+
+async function searchRecipes({ take, skip, q = '', ingredient = '', sort, ...filters }) {
+  const query = q.trim();
+  const ingredientText = ingredient.trim();
+  const baseWhere = Prisma.sql`
+    r.status = 'PUBLISHED'
+    AND r.visibility = 'PUBLIC'
+    AND r."deletedAt" IS NULL
+    AND r."hiddenAt" IS NULL
+    AND u.status = 'ACTIVE'
+    AND u."deletedAt" IS NULL
+    AND ${searchConditions({ query, ingredient: ingredientText })}
+    ${searchFilters(filters)}
+  `;
+  const rows = await prisma.$queryRaw(Prisma.sql`
+    SELECT r.id,
+      COUNT(*) OVER()::int AS total,
+      CASE WHEN ${query} <> '' AND (immutable_unaccent(r.title) ILIKE '%' || immutable_unaccent(${query}) || '%'
+        OR immutable_unaccent(r.title) % immutable_unaccent(${query})) THEN 1 ELSE 0 END AS title_hit,
+      CASE WHEN ${ingredientText} <> '' OR ${query} = '' THEN 0
+        WHEN EXISTS (
+          SELECT 1 FROM recipe_ingredients ri
+          WHERE ri."recipeId" = r.id
+            AND (immutable_unaccent(ri."displayName") % immutable_unaccent(${query})
+              OR immutable_unaccent(ri."displayName") ILIKE '%' || immutable_unaccent(${query}) || '%')
+        ) THEN 1 ELSE 0 END AS ingredient_hit,
+      ts_rank_cd(
+        to_tsvector('simple', immutable_unaccent(coalesce(r.title, '') || ' ' || coalesce(r.description, ''))),
+        plainto_tsquery('simple', immutable_unaccent(${query}))
+      ) AS text_rank
+    FROM recipes r
+    JOIN users u ON u.id = r."authorId"
+    WHERE ${baseWhere}
+    ORDER BY ${searchOrder(sort)}
+    LIMIT ${take} OFFSET ${skip}
   `);
-  return rows.map((row) => row.id);
+  let total = rows[0]?.total ?? 0;
+  if (!rows.length) {
+    const counted = await prisma.$queryRaw(Prisma.sql`
+      SELECT COUNT(*)::int AS total FROM recipes r JOIN users u ON u.id = r."authorId" WHERE ${baseWhere}
+    `);
+    total = counted[0]?.total ?? 0;
+  }
+  return { ids: rows.map((row) => row.id), total };
 }
 
 function recipeData(input) {
@@ -217,6 +301,14 @@ export async function publishRecipe(userId, userRole, id) {
 export async function listRecipes({ page = 1, limit = 20, q, ingredient, categoryId, tags, status, visibility, userId, maxCookTime, hasCooksnap = false, featured = false, diet, sort = 'newest' }) {
   const take = Math.min(Math.max(Number(limit) || 20, 1), 50);
   const skip = (Math.max(Number(page) || 1, 1) - 1) * take;
+
+  if (!userId && (q?.trim() || ingredient?.trim())) {
+    const { ids, total } = await searchRecipes({ take, skip, q, ingredient, sort, categoryId, tags, diet, maxCookTime, hasCooksnap: Boolean(hasCooksnap), featured: Boolean(featured) });
+    const items = ids.length ? await prisma.recipe.findMany({ where: { id: { in: ids } }, include: recipeInclude }) : [];
+    const byId = new Map(items.map((item) => [item.id, item]));
+    return { items: ids.map((id) => sanitizeRecipe(byId.get(id))).filter(Boolean), meta: { page: Math.floor(skip / take) + 1, limit: take, total, totalPages: Math.ceil(total / take) } };
+  }
+
   const where = { deletedAt: null, hiddenAt: null };
   if (userId) where.authorId = userId;
   else {
@@ -237,8 +329,6 @@ export async function listRecipes({ page = 1, limit = 20, q, ingredient, categor
   if (tags?.length) where.tags = { some: { tag: { slug: { in: tags } } } };
   if (maxCookTime !== undefined) where.cookTimeMinutes = { lte: maxCookTime };
   if (hasCooksnap) where.cooksnaps = { some: { status: 'ACTIVE', deletedAt: null } };
-  const searchIds = await findSearchIds(q, ingredient);
-  if (searchIds) where.id = { in: searchIds };
 
   const orderBy = sort === 'popular'
     ? [{ saveCount: 'desc' }, { cookSnapCount: 'desc' }, { viewCount: 'desc' }, { createdAt: 'desc' }]
