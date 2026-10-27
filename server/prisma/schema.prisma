@@ -307,15 +307,18 @@ model Collection {
   ownerId     String             @db.Uuid
   name        String             @db.VarChar(120)
   description String?            @db.VarChar(500)
+  coverImageId String?           @db.Uuid
   visibility  CollectionVisibility @default(PRIVATE)
   createdAt   DateTime           @default(now())
   updatedAt   DateTime           @updatedAt
 
-  owner     User       @relation(fields: [ownerId], references: [id], onDelete: Cascade)
-  bookmarks Bookmark[]
+  owner      User       @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  coverImage MediaAsset? @relation("CollectionCover", fields: [coverImageId], references: [id], onDelete: SetNull)
+  bookmarks  Bookmark[]
 
   @@unique([ownerId, name])
   @@index([ownerId, visibility])
+  @@index([coverImageId])
   @@map("collections")
 }
 
@@ -418,6 +421,7 @@ model MediaAsset {
   cookSnap Cooksnap?
   recipeCovers Recipe[] @relation("RecipeCover")
   recipeImages RecipeImage[]
+  collectionCovers Collection[] @relation("CollectionCover")
 
   @@index([ownerId, status, createdAt])
   @@index([status, createdAt])

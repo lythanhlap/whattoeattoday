@@ -22,6 +22,8 @@ export function AccountPage() {
   const [recipes, setRecipes] = useState([]);
   const [listState, setListState] = useState({ status: 'loading', error: null });
   const [collectionForm, setCollectionForm] = useState({ name: '', description: '', visibility: 'PRIVATE' });
+  const [collectionEdit, setCollectionEdit] = useState(null);
+  const [collectionCoverState, setCollectionCoverState] = useState({ status: 'idle', error: null });
   const [listError, setListError] = useState(null);
 
   const load = useCallback(async () => {
@@ -65,14 +67,45 @@ export function AccountPage() {
   };
 
   const renameCollection = async (collection) => {
-    const name = window.prompt('Tên bộ sưu tập', collection.name);
-    if (!name) return;
+    setCollectionEdit({
+      id: collection.id,
+      name: collection.name,
+      description: collection.description || '',
+      visibility: collection.visibility,
+      coverImageId: collection.coverImageId || '',
+      coverPreview: collection.coverImage?.secureUrl || '',
+    });
+    setCollectionCoverState({ status: 'idle', error: null });
+  };
+
+  const uploadCollectionCover = async (file) => {
+    if (!file) return;
+    if (!accessToken) {
+      setCollectionCoverState({ status: 'error', error: new Error('Hãy đăng nhập lại để upload ảnh.') });
+      return;
+    }
+    setCollectionCoverState({ status: 'uploading', error: null });
     try {
-      await communityApi.updateCollection(collection.id, {
-        name,
-        description: collection.description,
-        visibility: collection.visibility,
+      const uploaded = await uploadImageToCloudinary(file, accessToken, 'collection');
+      setCollectionEdit((current) => current && ({ ...current, coverImageId: uploaded.mediaAssetId, coverPreview: uploaded.secure_url }));
+      setCollectionCoverState({ status: 'success', error: null });
+    } catch (error) {
+      setCollectionCoverState({ status: 'error', error });
+    }
+  };
+
+  const saveCollection = async (event) => {
+    event.preventDefault();
+    if (!collectionEdit) return;
+    try {
+      await communityApi.updateCollection(collectionEdit.id, {
+        name: collectionEdit.name,
+        description: collectionEdit.description || null,
+        visibility: collectionEdit.visibility,
+        coverImageId: collectionEdit.coverImageId || null,
       }, accessToken);
+      setCollectionEdit(null);
+      setCollectionCoverState({ status: 'idle', error: null });
       load();
     } catch (error) { setListError(error); }
   };
@@ -141,7 +174,8 @@ export function AccountPage() {
 
               <h2 className="collection-heading">Bộ sưu tập</h2>
               <form className="collection-form" onSubmit={createCollection}>
-                <input required maxLength="100" placeholder="Tên bộ sưu tập mới" aria-label="Tên bộ sưu tập mới" value={collectionForm.name} onChange={(event) => setCollectionForm({ ...collectionForm, name: event.target.value })} />
+                <input required maxLength="120" placeholder="Tên bộ sưu tập mới" aria-label="Tên bộ sưu tập mới" value={collectionForm.name} onChange={(event) => setCollectionForm({ ...collectionForm, name: event.target.value })} />
+                <input maxLength="500" placeholder="Mô tả (tùy chọn)" aria-label="Mô tả bộ sưu tập mới" value={collectionForm.description} onChange={(event) => setCollectionForm({ ...collectionForm, description: event.target.value })} />
                 <select aria-label="Chế độ hiển thị bộ sưu tập" value={collectionForm.visibility} onChange={(event) => setCollectionForm({ ...collectionForm, visibility: event.target.value })}>
                   <option value="PRIVATE">Riêng tư</option>
                   <option value="PUBLIC">Công khai</option>
@@ -152,15 +186,47 @@ export function AccountPage() {
                 <ul className="saved-list">
                   {collections.map((collection) => (
                     <li key={collection.id}>
-                      <Link to={`/bo-suu-tap/${collection.id}`}>{collection.name}</Link>
-                      <span>
-                        {collection._count?.bookmarks || 0} món · {collection.visibility === 'PUBLIC' ? 'Công khai' : 'Riêng tư'}{' '}
-                        <button className="text-button" type="button" onClick={() => renameCollection(collection)}>Sửa</button>
-                        <button className="text-button" type="button" onClick={() => toggleCollectionVisibility(collection)}>
-                          {collection.visibility === 'PUBLIC' ? 'Chuyển riêng tư' : 'Chuyển công khai'}
-                        </button>
-                        <button className="icon-button" type="button" aria-label={`Xóa bộ sưu tập ${collection.name}`} onClick={() => removeCollection(collection.id)}>×</button>
-                      </span>
+                      {collectionEdit?.id === collection.id ? (
+                        <form className="collection-edit-form" onSubmit={saveCollection}>
+                          <input required maxLength="120" aria-label="Tên bộ sưu tập" value={collectionEdit.name} onChange={(event) => setCollectionEdit({ ...collectionEdit, name: event.target.value })} />
+                          <textarea rows="2" maxLength="500" placeholder="Mô tả (tùy chọn)" aria-label="Mô tả bộ sưu tập" value={collectionEdit.description} onChange={(event) => setCollectionEdit({ ...collectionEdit, description: event.target.value })} />
+                          <select aria-label="Chế độ hiển thị bộ sưu tập" value={collectionEdit.visibility} onChange={(event) => setCollectionEdit({ ...collectionEdit, visibility: event.target.value })}>
+                            <option value="PRIVATE">Riêng tư</option>
+                            <option value="PUBLIC">Công khai</option>
+                          </select>
+                          <div className="collection-cover-editor">
+                            {collectionEdit.coverPreview && <img className="collection-cover" src={optimizedImageUrl(collectionEdit.coverPreview, { width: 240, height: 160 })} alt={`Ảnh đại diện bộ sưu tập ${collectionEdit.name}`} width="240" height="160" />}
+                            <label>
+                              Ảnh đại diện (tùy chọn)
+                              <input type="file" accept="image/jpeg,image/png,image/webp" onChange={(event) => { uploadCollectionCover(event.target.files?.[0]); event.target.value = ''; }} />
+                            </label>
+                            {collectionEdit.coverPreview && (
+                              <button className="text-button" type="button" onClick={() => setCollectionEdit({ ...collectionEdit, coverImageId: '', coverPreview: '' })}>Bỏ ảnh</button>
+                            )}
+                          </div>
+                          {collectionCoverState.status === 'uploading' && <p className="field-hint" role="status">Đang upload ảnh...</p>}
+                          {collectionCoverState.error && <p className="field-error">{collectionCoverState.error.message}</p>}
+                          <div className="form-actions">
+                            <button className="primary-button" type="submit">Lưu</button>
+                            <button className="secondary-button" type="button" onClick={() => { setCollectionEdit(null); setCollectionCoverState({ status: 'idle', error: null }); }}>Hủy</button>
+                          </div>
+                        </form>
+                      ) : (
+                        <>
+                          {collection.coverImage?.secureUrl && (
+                            <img className="collection-thumb" src={optimizedImageUrl(collection.coverImage.secureUrl, { width: 96, height: 64 })} alt="" width="96" height="64" loading="lazy" />
+                          )}
+                          <Link to={`/bo-suu-tap/${collection.id}`}>{collection.name}</Link>
+                          <span>
+                            {collection._count?.bookmarks || 0} món · {collection.visibility === 'PUBLIC' ? 'Công khai' : 'Riêng tư'}{' '}
+                            <button className="text-button" type="button" onClick={() => renameCollection(collection)}>Sửa</button>
+                            <button className="text-button" type="button" onClick={() => toggleCollectionVisibility(collection)}>
+                              {collection.visibility === 'PUBLIC' ? 'Chuyển riêng tư' : 'Chuyển công khai'}
+                            </button>
+                            <button className="icon-button" type="button" aria-label={`Xóa bộ sưu tập ${collection.name}`} onClick={() => removeCollection(collection.id)}>×</button>
+                          </span>
+                        </>
+                      )}
                     </li>
                   ))}
                 </ul>

@@ -9,6 +9,8 @@ export function validateCollectionInput(body, { partial = false } = {}) {
     if (typeof body.name !== 'string' || body.name.trim().length < 2 || body.name.trim().length > 120) errors.name = 'Name must be 2 to 120 characters';
   }
   if (body.description !== undefined && body.description !== null && typeof body.description !== 'string') errors.description = 'Description must be text';
+  if (body.description !== undefined && body.description !== null && body.description.length > 500) errors.description = 'Description must be at most 500 characters';
+  if (body.coverImageId !== undefined && body.coverImageId !== null && (typeof body.coverImageId !== 'string' || body.coverImageId.length > 64)) errors.coverImageId = 'Cover image id is invalid';
   if (body.visibility !== undefined && !VISIBILITIES.has(body.visibility)) errors.visibility = 'Visibility is invalid';
   if (Object.keys(errors).length) throw validation(errors);
   return body;

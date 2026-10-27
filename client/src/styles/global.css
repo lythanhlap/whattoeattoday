@@ -468,6 +468,58 @@ h1 {
 .collection-form { display: flex; gap: 0.6rem; margin-top: 1rem; }
 .collection-form input { min-width: 0; flex: 1; padding: 0.65rem; border: 1px solid #cbd5cd; border-radius: 5px; font: inherit; }
 
+.collection-thumb {
+  width: 96px;
+  height: 64px;
+  border-radius: 6px;
+  object-fit: cover;
+  background: #dce9dd;
+}
+
+.collection-edit-form {
+  display: grid;
+  gap: 0.5rem;
+  width: 100%;
+  padding: 0.75rem;
+  border: 1px solid #dfe4dc;
+  border-radius: 8px;
+  background: #fbfcfa;
+}
+
+.collection-edit-form input,
+.collection-edit-form textarea,
+.collection-edit-form select {
+  padding: 0.55rem;
+  border: 1px solid #cbd5cd;
+  border-radius: 5px;
+  font: inherit;
+}
+
+.collection-cover-editor {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.collection-cover {
+  width: 120px;
+  height: 80px;
+  border-radius: 6px;
+  object-fit: cover;
+  background: #dce9dd;
+}
+
+.collection-cover-large {
+  display: block;
+  width: 100%;
+  max-height: 22rem;
+  margin: 1rem 0;
+  border-radius: 10px;
+  object-fit: cover;
+  background: #dce9dd;
+}
+
 .summary-label {
   display: block;
   margin-bottom: 0.45rem;

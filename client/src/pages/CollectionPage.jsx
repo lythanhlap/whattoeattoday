@@ -4,6 +4,7 @@ import { useAuth } from '../features/auth/AuthContext.jsx';
 import { communityApi } from '../services/apiClient.js';
 import { EmptyState, ErrorState, LoadingState, NotFoundState } from '../features/recipes/RecipeStates.jsx';
 import { RecipeCard } from '../features/recipes/RecipeCard.jsx';
+import { optimizedImageUrl } from '../utils/image.js';
 
 export function CollectionPage() {
   const { id } = useParams(); const { accessToken } = useAuth();
@@ -14,5 +15,16 @@ export function CollectionPage() {
   if (state.status === 'not-found') return <NotFoundState />;
   if (state.status === 'error') return <ErrorState error={state.error} onRetry={load} />;
   const { collection } = state;
-  return <section className="collection-page"><Link className="back-link" to="/tai-khoan">← Kho cá nhân</Link><p className="eyebrow">Bộ sưu tập {collection.visibility === 'PUBLIC' ? 'công khai' : 'riêng tư'}</p><h1>{collection.name}</h1><p className="lead">{collection.description || `Các món ăn được lưu bởi ${collection.owner?.profile?.displayName || collection.owner?.username}.`}</p>{collection.bookmarks.length ? <div className="recipe-grid">{collection.bookmarks.map((bookmark) => <RecipeCard key={`${bookmark.userId}-${bookmark.recipeId}`} recipe={bookmark.recipe} />)}</div> : <EmptyState title="Bộ sưu tập chưa có recipe"><p>Hãy lưu một công thức vào bộ sưu tập này.</p></EmptyState>}</section>;
+  return (
+    <section className="collection-page">
+      <Link className="back-link" to="/tai-khoan">← Kho cá nhân</Link>
+      <p className="eyebrow">Bộ sưu tập {collection.visibility === 'PUBLIC' ? 'công khai' : 'riêng tư'}</p>
+      <h1>{collection.name}</h1>
+      {collection.coverImage?.secureUrl && (
+        <img className="collection-cover-large" src={optimizedImageUrl(collection.coverImage.secureUrl, { width: 1200, height: 420 })} alt={`Ảnh đại diện bộ sưu tập ${collection.name}`} width="1200" height="420" />
+      )}
+      <p className="lead">{collection.description || `Các món ăn được lưu bởi ${collection.owner?.profile?.displayName || collection.owner?.username}.`}</p>
+      {collection.bookmarks.length ? <div className="recipe-grid">{collection.bookmarks.map((bookmark) => <RecipeCard key={`${bookmark.userId}-${bookmark.recipeId}`} recipe={bookmark.recipe} />)}</div> : <EmptyState title="Bộ sưu tập chưa có recipe"><p>Hãy lưu một công thức vào bộ sưu tập này.</p></EmptyState>}
+    </section>
+  );
 }
