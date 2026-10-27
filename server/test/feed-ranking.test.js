@@ -41,6 +41,51 @@ after(async () => {
   await prisma.$disconnect();
 });
 
+test('feed pagination stays stable and keeps popular older recipes visible at scale', async () => {
+  const author = await createUser('bulkauthor');
+  const follower = await createUser('bulkfollower');
+  const followed = await request(app).post(`/api/v1/users/${author.id}/follow`).set('Authorization', `Bearer ${follower.token}`);
+  assert.equal(followed.status, 204);
+
+  const now = Date.now();
+  const records = Array.from({ length: 120 }, (_, index) => ({
+    authorId: author.id,
+    title: `Bulk feed ${index} ${suffix}`,
+    slug: `bulk-feed-${index}-${suffix}`,
+    status: 'PUBLISHED',
+    visibility: 'PUBLIC',
+    createdAt: new Date(now - index * 60_000),
+    publishedAt: new Date(now - index * 60_000),
+    saveCount: 0,
+    cookSnapCount: 0,
+  }));
+  await prisma.recipe.createMany({ data: records });
+  const oldest = await prisma.recipe.findFirst({ where: { authorId: author.id, slug: `bulk-feed-119-${suffix}` }, select: { id: true } });
+  await prisma.recipe.update({ where: { id: oldest.id }, data: { saveCount: 500 } });
+
+  const firstPage = await request(app).get('/api/v1/me/feed?page=1&limit=10').set('Authorization', `Bearer ${follower.token}`);
+  assert.equal(firstPage.status, 200);
+  assert.equal(firstPage.body.meta.total, 120);
+  assert.equal(firstPage.body.meta.totalPages, 12);
+  assert.equal(firstPage.body.data[0].recipe.id, oldest.id);
+
+  const seen = new Set();
+  for (let page = 1; page <= 12; page += 1) {
+    const response = await request(app).get(`/api/v1/me/feed?page=${page}&limit=10`).set('Authorization', `Bearer ${follower.token}`);
+    assert.equal(response.status, 200);
+    for (const event of response.body.data) {
+      assert.equal(seen.has(event.recipe.id), false, `duplicate recipe ${event.recipe.id} on page ${page}`);
+      seen.add(event.recipe.id);
+    }
+  }
+  assert.equal(seen.size, 120);
+
+  const beyond = await request(app).get('/api/v1/me/feed?page=13&limit=10').set('Authorization', `Bearer ${follower.token}`);
+  assert.equal(beyond.status, 200);
+  assert.equal(beyond.body.data.length, 0);
+  assert.equal(beyond.body.meta.total, 120);
+});
+
 test('feed ranks featured recipes first, then popularity, and paginates deterministically', async () => {
   const author = await createUser('author');
   const follower = await createUser('follower');

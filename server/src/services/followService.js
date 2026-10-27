@@ -1,3 +1,4 @@
+import { Prisma } from '@prisma/client';
 import { prisma } from '../lib/prisma.js';
 function fail(message, code, statusCode) { const error = new Error(message); error.code = code; error.statusCode = statusCode; return error; }
 export async function follow(followerId, followingId) { if (followerId === followingId) throw fail('Cannot follow yourself', 'SELF_FOLLOW_FORBIDDEN', 422); const user = await prisma.user.findFirst({ where: { id: followingId, status: 'ACTIVE', deletedAt: null } }); if (!user) throw fail('User not found', 'USER_NOT_FOUND', 404); return prisma.follow.upsert({ where: { followerId_followingId: { followerId, followingId } }, create: { followerId, followingId }, update: {} }); }
@@ -55,23 +56,78 @@ export async function listFeed(userId, page = 1, limit = 20) {
   const skip = (currentPage - 1) * take;
   const follows = await prisma.follow.findMany({ where: { followerId: userId }, select: { followingId: true } });
   const followingIds = follows.map((item) => item.followingId);
-  const recipeWhere = { status: 'PUBLISHED', visibility: 'PUBLIC', deletedAt: null, hiddenAt: null, author: { status: 'ACTIVE', deletedAt: null }, ...(followingIds.length ? { authorId: { in: followingIds } } : {}) };
-  const cooksnapWhere = { status: 'ACTIVE', deletedAt: null, author: { status: 'ACTIVE', deletedAt: null }, recipe: { status: 'PUBLISHED', visibility: 'PUBLIC', deletedAt: null, hiddenAt: null, author: { status: 'ACTIVE', deletedAt: null } }, ...(followingIds.length ? { authorId: { in: followingIds } } : {}) };
-  const [recipeCount, cookSnapCount] = await prisma.$transaction([prisma.recipe.count({ where: recipeWhere }), prisma.cooksnap.count({ where: cooksnapWhere })]);
-  const windowSize = skip + take;
+  const authorFilter = followingIds.length ? followingIds : null;
+
+  const rows = await prisma.$queryRaw(Prisma.sql`
+    SELECT type, id, "createdAt", COUNT(*) OVER()::int AS total
+    FROM (
+      SELECT 'RECIPE'::text AS type, r.id, r."createdAt",
+        (r."featuredAt" IS NOT NULL) AS featured,
+        (r."saveCount" + r."cookSnapCount")::int AS score
+      FROM recipes r
+      JOIN users u ON u.id = r."authorId"
+      WHERE r.status = 'PUBLISHED'
+        AND r.visibility = 'PUBLIC'
+        AND r."deletedAt" IS NULL
+        AND r."hiddenAt" IS NULL
+        AND u.status = 'ACTIVE'
+        AND u."deletedAt" IS NULL
+        AND (${authorFilter}::uuid[] IS NULL OR r."authorId" = ANY(${authorFilter}::uuid[]))
+
+      UNION ALL
+
+      SELECT 'COOKSNAP'::text AS type, c.id, c."createdAt",
+        false AS featured,
+        0 AS score
+      FROM cooksnaps c
+      JOIN users u ON u.id = c."authorId"
+      JOIN recipes r ON r.id = c."recipeId"
+      JOIN users ru ON ru.id = r."authorId"
+      WHERE c.status = 'ACTIVE'
+        AND c."deletedAt" IS NULL
+        AND u.status = 'ACTIVE'
+        AND u."deletedAt" IS NULL
+        AND r.status = 'PUBLISHED'
+        AND r.visibility = 'PUBLIC'
+        AND r."deletedAt" IS NULL
+        AND r."hiddenAt" IS NULL
+        AND ru.status = 'ACTIVE'
+        AND ru."deletedAt" IS NULL
+        AND (${authorFilter}::uuid[] IS NULL OR c."authorId" = ANY(${authorFilter}::uuid[]))
+    ) feed
+    ORDER BY featured DESC, score DESC, "createdAt" DESC, id ASC
+    LIMIT ${take} OFFSET ${skip}
+  `);
+
+  const recipeIds = rows.filter((row) => row.type === 'RECIPE').map((row) => row.id);
+  const cooksnapIds = rows.filter((row) => row.type === 'COOKSNAP').map((row) => row.id);
   const [recipes, cooksnaps] = await prisma.$transaction([
-    prisma.recipe.findMany({ where: recipeWhere, take: windowSize, orderBy: { createdAt: 'desc' }, include: { author: { select: { id: true, username: true, profile: { select: { displayName: true } } } }, category: true } }),
-    prisma.cooksnap.findMany({ where: cooksnapWhere, take: windowSize, orderBy: { createdAt: 'desc' }, include: { author: { select: { id: true, username: true, profile: { select: { displayName: true } } } }, recipe: { select: { id: true, title: true, slug: true } } } }),
+    prisma.recipe.findMany({
+      where: { id: { in: recipeIds } },
+      include: { author: { select: { id: true, username: true, profile: { select: { displayName: true } } } }, category: true, coverImage: { select: { id: true, secureUrl: true } } },
+    }),
+    prisma.cooksnap.findMany({
+      where: { id: { in: cooksnapIds } },
+      include: { author: { select: { id: true, username: true, profile: { select: { displayName: true } } } }, recipe: { select: { id: true, title: true, slug: true } } },
+    }),
   ]);
-  const items = [
-    ...recipes.map((recipe) => ({ type: 'RECIPE', createdAt: recipe.createdAt, recipe })),
-    ...cooksnaps.map((cooksnap) => ({ type: 'COOKSNAP', createdAt: cooksnap.createdAt, cooksnap })),
-  ].sort((a, b) => {
-    const featuredA = a.type === 'RECIPE' && a.recipe.featuredAt ? 1 : 0; const featuredB = b.type === 'RECIPE' && b.recipe.featuredAt ? 1 : 0;
-    if (featuredA !== featuredB) return featuredB - featuredA;
-    const scoreA = a.type === 'RECIPE' ? a.recipe.saveCount + a.recipe.cookSnapCount : 0; const scoreB = b.type === 'RECIPE' ? b.recipe.saveCount + b.recipe.cookSnapCount : 0;
-    return scoreB - scoreA || new Date(b.createdAt) - new Date(a.createdAt);
-  }).slice(skip, skip + take);
-  const total = recipeCount + cookSnapCount;
+  const recipeById = new Map(recipes.map((recipe) => [recipe.id, recipe]));
+  const cooksnapById = new Map(cooksnaps.map((cooksnap) => [cooksnap.id, cooksnap]));
+  const items = rows.flatMap((row) => {
+    if (row.type === 'RECIPE') {
+      const recipe = recipeById.get(row.id);
+      return recipe ? [{ type: 'RECIPE', createdAt: recipe.createdAt, recipe }] : [];
+    }
+    const cooksnap = cooksnapById.get(row.id);
+    return cooksnap ? [{ type: 'COOKSNAP', createdAt: cooksnap.createdAt, cooksnap }] : [];
+  });
+
+  let total = rows[0]?.total ?? 0;
+  if (!rows.length) {
+    const recipeWhere = { status: 'PUBLISHED', visibility: 'PUBLIC', deletedAt: null, hiddenAt: null, author: { status: 'ACTIVE', deletedAt: null }, ...(authorFilter ? { authorId: { in: authorFilter } } : {}) };
+    const cooksnapWhere = { status: 'ACTIVE', deletedAt: null, author: { status: 'ACTIVE', deletedAt: null }, recipe: { status: 'PUBLISHED', visibility: 'PUBLIC', deletedAt: null, hiddenAt: null, author: { status: 'ACTIVE', deletedAt: null } }, ...(authorFilter ? { authorId: { in: authorFilter } } : {}) };
+    const [recipeCount, cookSnapCount] = await prisma.$transaction([prisma.recipe.count({ where: recipeWhere }), prisma.cooksnap.count({ where: cooksnapWhere })]);
+    total = recipeCount + cookSnapCount;
+  }
   return { items, meta: { page: currentPage, limit: take, total, totalPages: Math.ceil(total / take), mode: followingIds.length ? 'FOLLOWING' : 'DISCOVERY' } };
 }
