@@ -1,5 +1,6 @@
 import crypto from 'node:crypto';
 import { prisma } from '../lib/prisma.js';
+import { readableRecipeWhere } from '../utils/recipeAccess.js';
 
 function notFound() {
   const error = new Error('Recipe not found');
@@ -16,14 +17,7 @@ function buildViewerKey(userId, ip, userAgent) {
 
 export async function recordRecipeView(recipeId, { userId, ip, userAgent } = {}) {
   const recipe = await prisma.recipe.findFirst({
-    where: {
-      id: recipeId,
-      status: 'PUBLISHED',
-      visibility: 'PUBLIC',
-      deletedAt: null,
-      hiddenAt: null,
-      author: { status: 'ACTIVE', deletedAt: null },
-    },
+    where: { id: recipeId, ...readableRecipeWhere },
     select: { id: true, viewCount: true },
   });
   if (!recipe) throw notFound();

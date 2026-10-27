@@ -1,5 +1,6 @@
 import { Prisma } from '@prisma/client';
 import { prisma } from '../lib/prisma.js';
+import { readableRecipeWhere } from '../utils/recipeAccess.js';
 
 function serviceError(message, code, statusCode) {
   const error = new Error(message); error.code = code; error.statusCode = statusCode; return error;
@@ -15,7 +16,7 @@ export async function listBookmarks(userId) {
 }
 
 export async function addBookmark(userId, recipeId, collectionId) {
-  const recipe = await prisma.recipe.findFirst({ where: { id: recipeId, status: 'PUBLISHED', visibility: 'PUBLIC', deletedAt: null, hiddenAt: null, author: { status: 'ACTIVE', deletedAt: null } }, select: { id: true } });
+  const recipe = await prisma.recipe.findFirst({ where: { id: recipeId, ...readableRecipeWhere }, select: { id: true } });
   if (!recipe) throw serviceError('Recipe not found', 'RECIPE_NOT_FOUND', 404);
   if (collectionId) {
     const collection = await prisma.collection.findFirst({ where: { id: collectionId, ownerId: userId }, select: { id: true } });

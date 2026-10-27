@@ -158,7 +158,7 @@ export function RecipeDetailPage() {
     image: state.recipe?.coverImage?.secureUrl,
     type: 'article',
     jsonLd,
-    noindex: Boolean(state.recipe && state.recipe.status !== 'PUBLISHED'),
+    noindex: Boolean(state.recipe && (state.recipe.status !== 'PUBLISHED' || state.recipe.visibility !== 'PUBLIC')),
   });
 
   if (state.status === 'loading') return <LoadingState label="Đang tải công thức..." />;
@@ -282,6 +282,12 @@ export function RecipeDetailPage() {
           <strong>{STATUS_LABELS[recipe.status] || recipe.status}</strong>
           {recipe.status === 'PENDING_REVIEW' && <span> Công thức đang chờ biên tập viên duyệt.</span>}
           {recipe.reviewNote && <span> Ghi chú từ biên tập: {recipe.reviewNote}</span>}
+        </div>
+      )}
+      {isAuthor && recipe.status === 'PUBLISHED' && recipe.visibility === 'UNLISTED' && (
+        <div className="author-status" role="status">
+          <strong>Không liệt kê</strong>
+          <span> Công thức chỉ mở được bằng đường dẫn trực tiếp và không xuất hiện trong tìm kiếm, feed hay hồ sơ.</span>
         </div>
       )}
       {recipe.hiddenAt && <p className="form-error">Công thức đang bị ẩn và chỉ bạn có thể xem.</p>}

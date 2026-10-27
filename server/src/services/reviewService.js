@@ -66,12 +66,15 @@ export async function reviewRecipe(actorId, actorRole, recipeId, input) {
 
   const now = new Date();
   const note = input.note?.trim() || null;
+  const visibility = input.action === 'APPROVE'
+    ? (recipe.visibility === 'UNLISTED' ? 'UNLISTED' : 'PUBLIC')
+    : action.visibility;
   const updated = await prisma.$transaction(async (transaction) => {
     const saved = await transaction.recipe.update({
       where: { id: recipeId },
       data: {
         status: action.status,
-        visibility: action.visibility,
+        visibility,
         publishedAt: input.action === 'APPROVE' ? now : null,
         reviewedAt: now,
         reviewNote: note,
