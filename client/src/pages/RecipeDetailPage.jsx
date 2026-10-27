@@ -57,6 +57,8 @@ export function RecipeDetailPage() {
   const [servings, setServings] = useState(1);
   const [shareMessage, setShareMessage] = useState(null);
   const [related, setRelated] = useState([]);
+  const [editingCooksnapId, setEditingCooksnapId] = useState(null);
+  const [editCaption, setEditCaption] = useState('');
 
   const load = useCallback(async () => {
     setState({ status: 'loading', recipe: null, error: null });
@@ -217,6 +219,15 @@ export function RecipeDetailPage() {
       setCooksnaps((current) => [result.cooksnap, ...current]);
       setImageFile(null); setImageUrl(''); setCaption(''); setCooksnapStatus('success');
     } catch (error) { setCooksnapError(error); setCooksnapStatus('error'); }
+  };
+
+  const saveCooksnap = async (cooksnap) => {
+    try {
+      const result = await communityApi.updateCooksnap(cooksnap.id, { caption: editCaption }, accessToken);
+      setCooksnaps((current) => current.map((item) => (item.id === cooksnap.id ? result.cooksnap : item)));
+      setEditingCooksnapId(null);
+      setEditCaption('');
+    } catch (error) { setCooksnapError(error); }
   };
 
   const removeCooksnap = async (cooksnap) => {
@@ -380,12 +391,29 @@ export function RecipeDetailPage() {
               <figure key={cooksnap.id}>
                 <img src={optimizedImageUrl(cooksnap.imageUrl, { width: 480, height: 360 })} alt={`Món ${recipe.title} do ${displayName(cooksnap.author)} thực hiện`} loading="lazy" width="480" height="360" />
                 <figcaption>
-                  {cooksnap.caption || `Bởi ${displayName(cooksnap.author)}`}
-                  {accessToken && (
+                  {editingCooksnapId === cooksnap.id ? (
                     <span className="figure-actions">
-                      {cooksnap.authorId === user?.id && <button className="text-button" type="button" onClick={() => removeCooksnap(cooksnap)}>Xóa</button>}
-                      <button className="text-button" type="button" onClick={() => reportCommunityItem('COOKSNAP', cooksnap.id)}>Báo cáo</button>
+                      <input
+                        aria-label="Sửa nhận xét ảnh đã nấu"
+                        maxLength="1000"
+                        value={editCaption}
+                        onChange={(event) => setEditCaption(event.target.value)}
+                        placeholder="Nhận xét cho ảnh đã nấu"
+                      />
+                      <button className="text-button" type="button" onClick={() => saveCooksnap(cooksnap)}>Lưu</button>
+                      <button className="text-button" type="button" onClick={() => { setEditingCooksnapId(null); setEditCaption(''); }}>Hủy</button>
                     </span>
+                  ) : (
+                    <>
+                      {cooksnap.caption || `Bởi ${displayName(cooksnap.author)}`}
+                      {accessToken && (
+                        <span className="figure-actions">
+                          {cooksnap.authorId === user?.id && <button className="text-button" type="button" onClick={() => { setEditingCooksnapId(cooksnap.id); setEditCaption(cooksnap.caption || ''); }}>Sửa</button>}
+                          {cooksnap.authorId === user?.id && <button className="text-button" type="button" onClick={() => removeCooksnap(cooksnap)}>Xóa</button>}
+                          <button className="text-button" type="button" onClick={() => reportCommunityItem('COOKSNAP', cooksnap.id)}>Báo cáo</button>
+                        </span>
+                      )}
+                    </>
                   )}
                 </figcaption>
               </figure>

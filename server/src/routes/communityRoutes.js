@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { addBookmarkController, bulkResolveReportsController, createCollectionController, createCommentController, createCooksnapController, createRecipeReportController, createTargetReportController, deleteCollectionController, deleteCommentController, deleteCooksnapController, feedController, followController, getCollectionController, listAuditLogsController, listBookmarksController, listCollectionsController, listCommentsController, listCooksnapsController, listReportsController, profileConnectionsController, profileController, removeBookmarkController, resolveReportController, unfollowController, updateCollectionController } from '../controllers/communityController.js';
+import { addBookmarkController, bulkResolveReportsController, createCollectionController, createCommentController, createCooksnapController, createRecipeReportController, createTargetReportController, deleteCollectionController, deleteCommentController, deleteCooksnapController, feedController, followController, getCollectionController, listAuditLogsController, listBookmarksController, listCollectionsController, listCommentsController, listCooksnapsController, listReportsController, profileConnectionsController, profileController, removeBookmarkController, resolveReportController, unfollowController, updateCollectionController, updateCooksnapController } from '../controllers/communityController.js';
 import { featureRecipeController, suspendUserController, warnUserController } from '../controllers/adminController.js';
 import { listReviewQueueController, reviewRecipeController } from '../controllers/reviewController.js';
 import { updateProfileController } from '../controllers/profileController.js';
@@ -22,6 +22,7 @@ communityRoutes.post('/recipes/:id/report', requireAuth, rateLimit({ max: 30 }),
 communityRoutes.get('/recipes/:id/cooksnaps', optionalAuth, listCooksnapsController);
 communityRoutes.post('/recipes/:id/cooksnaps', requireAuth, rateLimit({ max: 30 }), createCooksnapController);
 communityRoutes.delete('/cooksnaps/:id', requireAuth, deleteCooksnapController);
+communityRoutes.patch('/cooksnaps/:id', requireAuth, updateCooksnapController);
 communityRoutes.get('/recipes/:id/comments', optionalAuth, listCommentsController);
 communityRoutes.post('/recipes/:id/comments', requireAuth, rateLimit({ max: 30 }), createCommentController);
 communityRoutes.delete('/comments/:id', requireAuth, deleteCommentController);

@@ -223,6 +223,14 @@ test('member can create and delete a cooksnap for a public recipe', async () => 
   assert.equal(listed.body.data.length, 1);
   const counter = await prisma.recipe.findUnique({ where: { id: created.body.data.recipe.id }, select: { cookSnapCount: true } });
   assert.equal(counter.cookSnapCount, 1);
+  const forbiddenEdit = await request(app).patch(`/api/v1/cooksnaps/${createdSnap.body.data.cooksnap.id}`).set('Authorization', `Bearer ${author.token}`).send({ caption: 'Không phải tác giả' });
+  assert.equal(forbiddenEdit.status, 403);
+  const emptyEdit = await request(app).patch(`/api/v1/cooksnaps/${createdSnap.body.data.cooksnap.id}`).set('Authorization', `Bearer ${member.token}`).send({});
+  assert.equal(emptyEdit.status, 422);
+  const edited = await request(app).patch(`/api/v1/cooksnaps/${createdSnap.body.data.cooksnap.id}`).set('Authorization', `Bearer ${member.token}`).send({ caption: 'Đã chỉnh sửa nhận xét.' });
+  assert.equal(edited.status, 200);
+  assert.equal(edited.body.data.cooksnap.caption, 'Đã chỉnh sửa nhận xét.');
+  assert.equal(edited.body.data.cooksnap.imageUrl, 'https://storage.example/cooksnap.jpg');
   const removed = await request(app).delete(`/api/v1/cooksnaps/${createdSnap.body.data.cooksnap.id}`).set('Authorization', `Bearer ${member.token}`);
   assert.equal(removed.status, 204);
   const afterRemove = await prisma.recipe.findUnique({ where: { id: created.body.data.recipe.id }, select: { cookSnapCount: true } });

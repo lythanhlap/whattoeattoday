@@ -26,6 +26,31 @@ export async function createCooksnap(authorId, recipeId, input) {
   });
 }
 
+export async function updateCooksnap(authorId, id, input) {
+  const cooksnap = await prisma.cooksnap.findUnique({ where: { id }, select: { id: true, authorId: true, status: true, mediaAssetId: true } });
+  if (!cooksnap || cooksnap.status === 'DELETED') throw error('Cooksnap not found', 'COOKSNAP_NOT_FOUND', 404);
+  if (cooksnap.authorId !== authorId) throw error('You do not have permission to edit this cooksnap', 'FORBIDDEN', 403);
+  return prisma.$transaction(async (transaction) => {
+    let imageUrl;
+    if (input.mediaAssetId) {
+      const asset = await transaction.mediaAsset.findFirst({ where: { id: input.mediaAssetId, ownerId: authorId, status: { in: ['UPLOADED', 'ATTACHED'] } } });
+      if (!asset?.secureUrl) throw error('Media asset is unavailable or does not belong to this user', 'MEDIA_ASSET_FORBIDDEN', 403);
+      if (input.mediaAssetId !== cooksnap.mediaAssetId) {
+        imageUrl = asset.secureUrl;
+        await transaction.mediaAsset.update({ where: { id: input.mediaAssetId }, data: { status: 'ATTACHED', attachedAt: new Date() } });
+      }
+    }
+    return transaction.cooksnap.update({
+      where: { id },
+      data: {
+        ...(input.caption !== undefined ? { caption: input.caption } : {}),
+        ...(imageUrl ? { imageUrl, mediaAssetId: input.mediaAssetId } : {}),
+      },
+      include: { author: { select: authorSelect } },
+    });
+  });
+}
+
 export async function deleteCooksnap(authorId, id, role) {
   const cooksnap = await prisma.cooksnap.findUnique({ where: { id }, select: { id: true, authorId: true, recipeId: true, status: true } });
   if (!cooksnap || cooksnap.status === 'DELETED') throw error('Cooksnap not found', 'COOKSNAP_NOT_FOUND', 404);

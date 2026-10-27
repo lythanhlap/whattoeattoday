@@ -113,6 +113,7 @@ export const communityApi = {
   auditLogs: (accessToken) => apiRequest('/moderation/audit-logs', { accessToken }),
   cooksnaps: (recipeId, accessToken) => apiRequest(`/recipes/${recipeId}/cooksnaps`, { accessToken }),
   createCooksnap: (recipeId, input, accessToken) => apiRequest(`/recipes/${recipeId}/cooksnaps`, { method: 'POST', accessToken, body: JSON.stringify(input) }),
+  updateCooksnap: (id, input, accessToken) => apiRequest(`/cooksnaps/${id}`, { method: 'PATCH', accessToken, body: JSON.stringify(input) }),
   deleteCooksnap: (id, accessToken) => apiRequest(`/cooksnaps/${id}`, { method: 'DELETE', accessToken }),
   comments: (recipeId, accessToken) => apiRequest(`/recipes/${recipeId}/comments`, { accessToken }),
   createComment: (recipeId, content, accessToken) => apiRequest(`/recipes/${recipeId}/comments`, { method: 'POST', accessToken, body: JSON.stringify({ content }) }),

@@ -3,8 +3,8 @@ import { createCollection, deleteCollection, getCollection, listCollections, upd
 import { validateBookmarkInput, validateCollectionInput } from '../validators/communityValidator.js';
 import { validateModerationAction, validateReportInput } from '../validators/communityValidator.js';
 import { createRecipeReport, listAuditLogs, listReports, resolveReport } from '../services/moderationService.js';
-import { createCooksnap, deleteCooksnap, listCooksnaps } from '../services/cooksnapService.js';
-import { validateCooksnapInput } from '../validators/cooksnapValidator.js';
+import { createCooksnap, deleteCooksnap, listCooksnaps, updateCooksnap } from '../services/cooksnapService.js';
+import { validateCooksnapInput, validateCooksnapUpdate } from '../validators/cooksnapValidator.js';
 import { createComment, deleteComment, listComments } from '../services/commentService.js';
 import { validateCommentInput } from '../validators/commentValidator.js';
 import { follow, getProfile, listFeed, listProfileConnections, unfollow } from '../services/followService.js';
@@ -26,6 +26,7 @@ export async function listAuditLogsController(request, response, next) { try { c
 export async function listCooksnapsController(request, response, next) { try { response.json({ data: await listCooksnaps(request.params.id, request.auth?.userId), meta: {}, error: null }); } catch (error) { next(error); } }
 export async function createCooksnapController(request, response, next) { try { const cooksnap = await createCooksnap(request.auth.userId, request.params.id, validateCooksnapInput(request.body)); response.status(201).json({ data: { cooksnap }, meta: {}, error: null }); } catch (error) { next(error); } }
 export async function deleteCooksnapController(request, response, next) { try { await deleteCooksnap(request.auth.userId, request.params.id, request.auth.role); response.status(204).send(); } catch (error) { next(error); } }
+export async function updateCooksnapController(request, response, next) { try { const cooksnap = await updateCooksnap(request.auth.userId, request.params.id, validateCooksnapUpdate(request.body)); response.json({ data: { cooksnap }, meta: {}, error: null }); } catch (error) { next(error); } }
 export async function listCommentsController(request, response, next) { try { response.json({ data: await listComments(request.params.id), meta: {}, error: null }); } catch (error) { next(error); } }
 export async function createCommentController(request, response, next) { try { const comment = await createComment(request.auth.userId, request.params.id, validateCommentInput(request.body)); response.status(201).json({ data: { comment }, meta: {}, error: null }); } catch (error) { next(error); } }
 export async function deleteCommentController(request, response, next) { try { await deleteComment(request.auth.userId, request.params.id, request.auth.role); response.status(204).send(); } catch (error) { next(error); } }
