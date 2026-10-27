@@ -5,6 +5,7 @@ import { communityApi } from '../services/apiClient.js';
 import { EmptyState, ErrorState, LoadingState, NotFoundState } from '../features/recipes/RecipeStates.jsx';
 import { RecipeCard } from '../features/recipes/RecipeCard.jsx';
 import { useDocumentMeta } from '../lib/useDocumentMeta.js';
+import { optimizedImageUrl } from '../utils/image.js';
 
 function displayName(person) {
   return person?.profile?.displayName || person?.username || 'Thành viên';
@@ -64,7 +65,7 @@ export function ProfilePage() {
     <section className="profile-page">
       <header className="profile-header">
         {profile.profile?.avatarUrl
-          ? <img className="profile-avatar" src={profile.profile.avatarUrl} alt={`Ảnh đại diện của ${displayName(profile)}`} width="96" height="96" />
+          ? <img className="profile-avatar" src={optimizedImageUrl(profile.profile.avatarUrl, { width: 96, height: 96 })} alt={`Ảnh đại diện của ${displayName(profile)}`} width="96" height="96" />
           : <div className="profile-avatar profile-avatar-placeholder" aria-hidden="true">{displayName(profile).slice(0, 1)}</div>}
         <div>
           <p className="eyebrow">Hồ sơ thành viên</p>
@@ -126,7 +127,7 @@ export function ProfilePage() {
             {profile.cooksnaps.map((cooksnap) => (
               <figure key={cooksnap.id}>
                 <img
-                  src={cooksnap.imageUrl}
+                  src={optimizedImageUrl(cooksnap.imageUrl, { width: 480, height: 360 })}
                   alt={`Món ${cooksnap.recipe?.title || 'đã nấu'} do ${displayName(profile)} thực hiện`}
                   loading="lazy"
                   width="480"

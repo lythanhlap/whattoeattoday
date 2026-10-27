@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { RecipeCard } from '../features/recipes/RecipeCard.jsx';
 import { challengeApi, discoveryApi, recipeApi } from '../services/apiClient.js';
 import { useDocumentMeta } from '../lib/useDocumentMeta.js';
+import { optimizedImageUrl } from '../utils/image.js';
 
 function useSection(loader) {
   const [state, setState] = useState({ status: 'loading', items: [], error: null });
@@ -127,7 +128,7 @@ export function HomePage() {
           <div className="challenge-grid">
             {challenges.items.map((challenge) => (
               <article className="challenge-card" key={challenge.id}>
-                {challenge.bannerUrl && <img src={challenge.bannerUrl} alt={`Banner thử thách ${challenge.title}`} loading="lazy" />}
+                {challenge.bannerUrl && <img src={optimizedImageUrl(challenge.bannerUrl, { width: 1200, height: 600 })} alt={`Banner thử thách ${challenge.title}`} loading="lazy" width="1200" height="600" />}
                 <div className="challenge-card-body">
                   <span className="status-badge status-active">Đang diễn ra</span>
                   <h3><Link to={`/thu-thach/${challenge.id}`}>{challenge.title}</Link></h3>

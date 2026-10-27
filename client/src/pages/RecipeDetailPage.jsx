@@ -5,6 +5,7 @@ import { communityApi, recipeApi, uploadImageToCloudinary } from '../services/ap
 import { ErrorState, LoadingState, NotFoundState } from '../features/recipes/RecipeStates.jsx';
 import { RecipeCard } from '../features/recipes/RecipeCard.jsx';
 import { scaleQuantity } from '../utils/quantity.js';
+import { optimizedImageUrl } from '../utils/image.js';
 import { useDocumentMeta } from '../lib/useDocumentMeta.js';
 
 const REPORT_REASONS = [
@@ -304,7 +305,7 @@ export function RecipeDetailPage() {
       {shareMessage && <p className="form-success" role="status">{shareMessage}</p>}
 
       {recipe.coverImage?.secureUrl && (
-        <img className="recipe-cover" src={recipe.coverImage.secureUrl} alt={`Ảnh món ${recipe.title}`} width="1200" height="700" />
+        <img className="recipe-cover" src={optimizedImageUrl(recipe.coverImage.secureUrl, { width: 1200, height: 700 })} alt={`Ảnh món ${recipe.title}`} width="1200" height="700" />
       )}
 
       <div className="detail-stats">
@@ -377,7 +378,7 @@ export function RecipeDetailPage() {
           <div className="cooksnap-grid">
             {cooksnaps.map((cooksnap) => (
               <figure key={cooksnap.id}>
-                <img src={cooksnap.imageUrl} alt={`Món ${recipe.title} do ${displayName(cooksnap.author)} thực hiện`} loading="lazy" width="480" height="360" />
+                <img src={optimizedImageUrl(cooksnap.imageUrl, { width: 480, height: 360 })} alt={`Món ${recipe.title} do ${displayName(cooksnap.author)} thực hiện`} loading="lazy" width="480" height="360" />
                 <figcaption>
                   {cooksnap.caption || `Bởi ${displayName(cooksnap.author)}`}
                   {accessToken && (

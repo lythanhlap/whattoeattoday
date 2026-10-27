@@ -5,6 +5,7 @@ import { RecipeCard } from '../features/recipes/RecipeCard.jsx';
 import { EmptyState, ErrorState, LoadingState, NotFoundState } from '../features/recipes/RecipeStates.jsx';
 import { challengeApi, recipeApi, uploadImageToCloudinary } from '../services/apiClient.js';
 import { useDocumentMeta } from '../lib/useDocumentMeta.js';
+import { optimizedImageUrl } from '../utils/image.js';
 
 const STATUS_LABELS = {
   DRAFT: 'Bản nháp',
@@ -174,7 +175,7 @@ export function ChallengeDetailPage() {
   return (
     <article className="challenge-detail">
       <Link className="back-link" to="/thu-thach">← Tất cả thử thách</Link>
-      {challenge.bannerUrl && <img className="challenge-banner" src={challenge.bannerUrl} alt={`Banner thử thách ${challenge.title}`} />}
+      {challenge.bannerUrl && <img className="challenge-banner" src={optimizedImageUrl(challenge.bannerUrl, { width: 1200, height: 600 })} alt={`Banner thử thách ${challenge.title}`} width="1200" height="600" />}
       <div className="detail-header">
         <div>
           <span className={`status-badge status-${challenge.status.toLowerCase()}`}>{STATUS_LABELS[challenge.status]}</span>

@@ -4,6 +4,7 @@ import { useAuth } from '../features/auth/AuthContext.jsx';
 import { EmptyState, ErrorState, LoadingState } from '../features/recipes/RecipeStates.jsx';
 import { editorialApi, taxonomyApi } from '../services/apiClient.js';
 import { useDocumentMeta } from '../lib/useDocumentMeta.js';
+import { optimizedImageUrl } from '../utils/image.js';
 
 const STATUS_OPTIONS = [
   { value: 'PENDING_REVIEW', label: 'Chờ duyệt' },
@@ -136,7 +137,7 @@ function ReviewQueue({ accessToken }) {
             <article className="review-item" key={recipe.id}>
               <div className="review-item-media">
                 {recipe.coverImage?.secureUrl
-                  ? <img src={recipe.coverImage.secureUrl} alt={`Ảnh món ${recipe.title}`} loading="lazy" width="240" height="160" />
+                  ? <img src={optimizedImageUrl(recipe.coverImage.secureUrl, { width: 240, height: 160 })} alt={`Ảnh món ${recipe.title}`} loading="lazy" width="240" height="160" />
                   : <div className="recipe-card-placeholder" aria-hidden="true">{recipe.title.slice(0, 1)}</div>}
               </div>
               <div className="review-item-body">

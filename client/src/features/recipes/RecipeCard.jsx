@@ -1,7 +1,8 @@
 import { Link } from 'react-router-dom';
+import { optimizedImageUrl } from '../../utils/image.js';
 
 export function RecipeCard({ recipe }) {
-  const coverUrl = recipe.coverImage?.secureUrl;
+  const coverUrl = optimizedImageUrl(recipe.coverImage?.secureUrl, { width: 640, height: 420 });
   return (
     <article className="recipe-card">
       {coverUrl ? (

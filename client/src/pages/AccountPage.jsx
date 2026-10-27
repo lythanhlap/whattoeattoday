@@ -4,6 +4,7 @@ import { authApi, communityApi, recipeApi, uploadImageToCloudinary } from '../se
 import { useAuth } from '../features/auth/AuthContext.jsx';
 import { EmptyState, ErrorState, LoadingState } from '../features/recipes/RecipeStates.jsx';
 import { RecipeCard } from '../features/recipes/RecipeCard.jsx';
+import { optimizedImageUrl } from '../utils/image.js';
 
 const STATUS_LABELS = {
   DRAFT: 'Bản nháp',
@@ -210,7 +211,7 @@ function ProfilePanel({ user, accessToken, updateUser }) {
       {status.message && <p className="form-success" role="status">{status.message}</p>}
       {status.error && <p className="form-error" role="alert">{status.error.message}</p>}
       <form className="account-form" onSubmit={submit}>
-        {avatarPreview && <img className="avatar-preview" src={avatarPreview} alt="Ảnh đại diện hiện tại" width="96" height="96" />}
+        {avatarPreview && <img className="avatar-preview" src={optimizedImageUrl(avatarPreview, { width: 96, height: 96 })} alt="Ảnh đại diện hiện tại" width="96" height="96" />}
         <label>
           Ảnh đại diện
           <input type="file" accept="image/jpeg,image/png,image/webp" onChange={(event) => setAvatarFile(event.target.files?.[0] || null)} />

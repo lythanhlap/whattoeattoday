@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { useAuth } from '../features/auth/AuthContext.jsx';
 import { challengeApi } from '../services/apiClient.js';
 import { EmptyState, ErrorState, LoadingState } from '../features/recipes/RecipeStates.jsx';
+import { optimizedImageUrl } from '../utils/image.js';
 
 const STATUS_LABELS = {
   DRAFT: 'Bản nháp',
@@ -118,7 +119,7 @@ export function ChallengesPage() {
           <div className="challenge-grid">
             {state.items.map((challenge) => (
               <article className="challenge-card" key={challenge.id}>
-                {challenge.bannerUrl && <img src={challenge.bannerUrl} alt={`Banner thử thách ${challenge.title}`} loading="lazy" />}
+                {challenge.bannerUrl && <img src={optimizedImageUrl(challenge.bannerUrl, { width: 1200, height: 600 })} alt={`Banner thử thách ${challenge.title}`} loading="lazy" width="1200" height="600" />}
                 <div className="challenge-card-body">
                   <span className={`status-badge status-${challenge.status.toLowerCase()}`}>{STATUS_LABELS[challenge.status]}</span>
                   <h2><Link to={`/thu-thach/${challenge.id}`}>{challenge.title}</Link></h2>
