@@ -1,0 +1,35 @@
+---
+description: Quy tac cot loi cho nen tang cong dong cong thuc nau an
+alwaysApply: true
+---
+
+# Project Core
+
+- Frontend: React + JavaScript + Vite.
+- Backend: Node.js + Express.js + JavaScript.
+- Database: PostgreSQL + Prisma.
+- API: REST voi prefix `/api/v1`.
+- Kien truc: modular monolith.
+- Anh luu trong object storage, khong luu binary trong PostgreSQL.
+- Khong sao chep logo, thuong hieu, noi dung, hinh anh hoac giao dien cua Cookpad.
+
+## Rules
+
+- Doc code hien tai truoc khi sua.
+- Moi task chi co mot muc tieu ro rang.
+- Khong tu y doi framework, database hoac kien truc.
+- Khong xoa file chua duoc kiem tra.
+- Khong mo rong ngoai pham vi task.
+- Route chi khai bao endpoint.
+- Controller xu ly request va response.
+- Service xu ly business logic.
+- Validator xu ly input.
+- Middleware xu ly auth, permission va error.
+- Moi thay doi database phai co migration.
+- Moi API phai co validation va permission phu hop.
+- Frontend phai xu ly loading, empty, error va not-found state.
+- Sau moi thay doi phai chay lint va test lien quan.
+
+## Completion
+
+Bao cao file da sua, logic da them, lenh da chay, ket qua kiem tra va viec con thieu.

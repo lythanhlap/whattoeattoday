@@ -1,0 +1,10 @@
+CREATE TABLE "follows" ("followerId" UUID NOT NULL, "followingId" UUID NOT NULL, "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP, CONSTRAINT "follows_pkey" PRIMARY KEY ("followerId", "followingId"));
+CREATE INDEX "follows_followingId_createdAt_idx" ON "follows"("followingId", "createdAt");
+ALTER TABLE "follows" ADD CONSTRAINT "follows_followerId_fkey" FOREIGN KEY ("followerId") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+ALTER TABLE "follows" ADD CONSTRAINT "follows_followingId_fkey" FOREIGN KEY ("followingId") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+ALTER TABLE "reports" ALTER COLUMN "recipeId" DROP NOT NULL;
+ALTER TABLE "reports" ADD COLUMN "commentId" UUID, ADD COLUMN "cooksnapId" UUID;
+CREATE INDEX "reports_commentId_idx" ON "reports"("commentId");
+CREATE INDEX "reports_cooksnapId_idx" ON "reports"("cooksnapId");
+ALTER TABLE "reports" ADD CONSTRAINT "reports_commentId_fkey" FOREIGN KEY ("commentId") REFERENCES "comments"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE "reports" ADD CONSTRAINT "reports_cooksnapId_fkey" FOREIGN KEY ("cooksnapId") REFERENCES "cooksnaps"("id") ON DELETE RESTRICT ON UPDATE CASCADE;

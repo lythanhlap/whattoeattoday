@@ -1,0 +1,20 @@
+{
+  "name": "recipe-community-platform",
+  "private": true,
+  "workspaces": [
+    "client",
+    "server"
+  ],
+  "scripts": {
+    "dev:client": "npm run dev --workspace client",
+    "dev:server": "npm run dev --workspace server",
+    "build": "npm run build --workspace client",
+    "lint": "npm run lint --workspaces --if-present",
+    "test": "npm run test --workspace server",
+    "test:redis": "npm run test:redis --workspace server",
+    "prisma:generate": "npm run prisma:generate --workspace server",
+    "prisma:validate": "npm run prisma:validate --workspace server",
+    "prisma:migrate": "npm run prisma:migrate --workspace server",
+    "prisma:seed": "npm run prisma:seed --workspace server"
+  }
+}

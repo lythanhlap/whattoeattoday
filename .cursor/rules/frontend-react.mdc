@@ -1,0 +1,23 @@
+---
+description: Quy tac phat trien giao dien React cho website cong thuc nau an
+globs: client/**/*.{js,jsx,css,scss}
+alwaysApply: false
+---
+
+# React Frontend
+
+- To chuc code theo feature: auth, recipes, search, bookmarks, collections, cooksnaps, comments, profiles, challenges.
+- Component chi quan ly UI va interaction.
+- Goi API qua service hoac custom hook, khong goi truc tiep trong JSX phuc tap.
+- Dung React Query cho server state neu da duoc cai dat.
+- Dung React Hook Form cho form dai va form cong thuc.
+- Khong dat business logic phuc tap trong component.
+- Moi request bat dong bo phai co loading, empty, error va success state.
+- Khoa nut submit khi request dang xu ly.
+- Hien thi loi validation gan truong input.
+- Dung `aria-label` cho icon button.
+- Anh phai co `alt`, lazy loading va kich thuoc on dinh.
+- Khong de text tran khoi container tren mobile.
+- Khong dung mock data nhu du lieu that sau khi API da co.
+- Khong them card long trong card neu khong can thiet.
+- Giu layout responsive cho mobile, tablet va desktop.

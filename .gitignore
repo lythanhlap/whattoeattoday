@@ -1,0 +1,31 @@
+# Dependencies
+node_modules/
+
+# Build output and coverage
+dist/
+coverage/
+.vite/
+*.tsbuildinfo
+
+# Environment files
+.env
+.env.*
+!.env.example
+
+# Logs
+npm-debug.log*
+*.log
+
+# Local database files
+server/prisma/dev.db
+
+# Internal planning and specification documents (kept local, not part of the product)
+PROJECT_PROGRESS*.md
+BUSINESS_REQUIREMENTS.md
+VIBECODING.md
+
+# Editor and OS metadata
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db

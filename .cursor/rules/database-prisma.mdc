@@ -1,0 +1,24 @@
+---
+description: Quy tac PostgreSQL Prisma migration va mo hinh du lieu
+globs: server/prisma/**/*.{prisma,js,sql}
+alwaysApply: false
+---
+
+# PostgreSQL and Prisma
+
+- PostgreSQL la source of truth cua he thong.
+- Moi thay doi schema phai duoc tao bang Prisma Migrate.
+- Khong dung `prisma db push` trong production.
+- Khong sua truc tiep production database.
+- Moi quan he bat buoc phai co foreign key.
+- Du lieu khong duoc trung phai co unique constraint.
+- Dung UUID cho ID neu day la pattern cua project.
+- Dung `createdAt` va `updatedAt` cho entity chinh.
+- Dung `deletedAt` cho soft delete khi can giu lich su.
+- Dung transaction cho recipe, ingredients, steps, tags va cac thao tac lien quan.
+- Dung atomic update cho viewCount, saveCount va cookSnapCount.
+- Tao index cho slug, status, visibility, authorId, publishedAt va cac truong search/filter.
+- Khong luu binary image trong PostgreSQL.
+- Dung `$queryRaw` chi voi parameterized query va khi Prisma khong dap ung duoc full-text search.
+- Migration phai tuong thich nguoc trong qua trinh deploy.
+- Moi thay doi schema phai co seed hoac test phu hop neu can.

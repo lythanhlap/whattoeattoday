@@ -1,0 +1,504 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  USER
+  EDITOR
+  MODERATOR
+  ADMIN
+}
+
+enum UserStatus {
+  PENDING
+  ACTIVE
+  SUSPENDED
+  DELETED
+}
+
+enum RecipeStatus {
+  DRAFT
+  PENDING_REVIEW
+  PUBLISHED
+  REJECTED
+  ARCHIVED
+}
+
+enum RecipeVisibility {
+  PUBLIC
+  PRIVATE
+  UNLISTED
+}
+
+enum RecipeDifficulty {
+  EASY
+  MEDIUM
+  HARD
+}
+
+enum CollectionVisibility {
+  PUBLIC
+  PRIVATE
+}
+
+enum ReportReason {
+  SPAM
+  COPIED_CONTENT
+  IRRELEVANT_IMAGE
+  DANGEROUS_OR_MISLEADING
+  HARASSMENT
+  COPYRIGHT
+  OFF_TOPIC
+  OTHER
+}
+
+enum ReportStatus {
+  OPEN
+  DISMISSED
+  RESOLVED
+}
+
+enum CooksnapStatus {
+  ACTIVE
+  HIDDEN
+  DELETED
+}
+
+enum MediaAssetStatus {
+  UPLOADED
+  ATTACHED
+  CLEANING
+  DELETED
+}
+
+enum ChallengeStatus {
+  DRAFT
+  UPCOMING
+  ACTIVE
+  ENDED
+  ARCHIVED
+}
+
+model User {
+  id              String         @id @default(uuid()) @db.Uuid
+  email           String         @db.VarChar(320)
+  username        String         @db.VarChar(30)
+  passwordHash    String         @db.VarChar(255)
+  role            UserRole       @default(USER)
+  status          UserStatus     @default(PENDING)
+  emailVerifiedAt DateTime?
+  lastLoginAt     DateTime?
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+  deletedAt       DateTime?
+  suspendedUntil  DateTime?
+  suspensionReason String?       @db.VarChar(500)
+
+  profile       UserProfile?
+  refreshTokens RefreshToken[]
+  recipes       Recipe[]
+  bookmarks     Bookmark[]
+  collections   Collection[]
+  reports       Report[]        @relation("ReportReporter")
+  resolvedReports Report[]      @relation("ReportResolver")
+  auditLogs     AuditLog[]
+  cooksnaps     Cooksnap[]
+  comments      Comment[]
+  followsFrom   Follow[] @relation("Follower")
+  followsTo     Follow[] @relation("Following")
+  mediaAssets   MediaAsset[]
+  notifications Notification[]
+  createdChallenges Challenge[] @relation("ChallengeCreator")
+  challengeEntries ChallengeEntry[] @relation("ChallengeSubmitter")
+  removedChallengeEntries ChallengeEntry[] @relation("ChallengeEntryRemover")
+
+  @@index([status])
+  @@index([role])
+  @@index([deletedAt])
+  @@index([suspendedUntil])
+  @@map("users")
+}
+
+model UserProfile {
+  id          String   @id @default(uuid()) @db.Uuid
+  userId      String   @unique @db.Uuid
+  displayName String   @db.VarChar(100)
+  avatarUrl   String?  @db.VarChar(2048)
+  bio         String?  @db.VarChar(500)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("user_profiles")
+}
+
+model RefreshToken {
+  id         String    @id @default(uuid()) @db.Uuid
+  userId     String    @db.Uuid
+  tokenHash  String    @unique @db.VarChar(255)
+  expiresAt  DateTime
+  revokedAt  DateTime?
+  createdAt  DateTime  @default(now())
+  lastUsedAt DateTime?
+  userAgent  String?   @db.VarChar(1000)
+  ipAddress  String?   @db.VarChar(45)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([userId, revokedAt])
+  @@index([expiresAt])
+  @@index([revokedAt])
+  @@map("refresh_tokens")
+}
+
+model Category {
+  id          String   @id @default(uuid()) @db.Uuid
+  name        String   @db.VarChar(100)
+  slug        String   @unique @db.VarChar(120)
+  description String?  @db.VarChar(500)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  recipes Recipe[]
+
+  @@index([name])
+  @@map("categories")
+}
+
+model Tag {
+  id        String   @id @default(uuid()) @db.Uuid
+  name      String   @db.VarChar(60)
+  slug      String   @unique @db.VarChar(80)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  recipes RecipeTag[]
+
+  @@index([name])
+  @@map("tags")
+}
+
+model Recipe {
+  id                String           @id @default(uuid()) @db.Uuid
+  authorId          String           @db.Uuid
+  categoryId        String?          @db.Uuid
+  title             String           @db.VarChar(150)
+  slug              String           @unique @db.VarChar(180)
+  description       String?          @db.VarChar(2000)
+  coverImageId      String?          @db.Uuid
+  prepTimeMinutes   Int?
+  cookTimeMinutes   Int?
+  totalTimeMinutes  Int?
+  servings          Int?
+  difficulty        RecipeDifficulty?
+  tips              String?          @db.VarChar(3000)
+  substitutions     String?          @db.VarChar(3000)
+  storageInstructions String?        @db.VarChar(2000)
+  status            RecipeStatus     @default(DRAFT)
+  visibility        RecipeVisibility @default(PRIVATE)
+  viewCount         Int              @default(0)
+  saveCount         Int              @default(0)
+  cookSnapCount     Int              @default(0)
+  publishedAt       DateTime?
+  createdAt         DateTime         @default(now())
+  updatedAt         DateTime         @updatedAt
+  deletedAt         DateTime?
+  hiddenAt          DateTime?
+  hiddenReason      String?          @db.VarChar(500)
+  featuredAt        DateTime?
+  reviewedAt        DateTime?
+  reviewNote        String?          @db.VarChar(1000)
+
+  author      User               @relation(fields: [authorId], references: [id], onDelete: Restrict)
+  category    Category?          @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  coverImage  MediaAsset?        @relation("RecipeCover", fields: [coverImageId], references: [id], onDelete: SetNull)
+  ingredients RecipeIngredient[]
+  steps       RecipeStep[]
+  tags        RecipeTag[]
+  bookmarks   Bookmark[]
+  reports     Report[]
+  cooksnaps   Cooksnap[]
+  comments    Comment[]
+  challengeEntries ChallengeEntry[]
+  views       RecipeView[]
+
+  @@index([authorId])
+  @@index([categoryId])
+  @@index([coverImageId])
+  @@index([status, visibility])
+  @@index([publishedAt])
+  @@index([featuredAt])
+  @@index([createdAt])
+  @@index([deletedAt])
+  @@map("recipes")
+}
+
+model RecipeIngredient {
+  id          String   @id @default(uuid()) @db.Uuid
+  recipeId    String   @db.Uuid
+  ingredientId String? @db.Uuid
+  displayName String   @db.VarChar(150)
+  quantity    String?  @db.VarChar(50)
+  unit        String?  @db.VarChar(50)
+  note        String?  @db.VarChar(300)
+  sortOrder   Int
+  isOptional  Boolean  @default(false)
+
+  recipe Recipe @relation(fields: [recipeId], references: [id], onDelete: Cascade)
+
+  @@index([recipeId, sortOrder])
+  @@map("recipe_ingredients")
+}
+
+model RecipeStep {
+  id              String   @id @default(uuid()) @db.Uuid
+  recipeId        String   @db.Uuid
+  stepNumber      Int
+  instruction     String   @db.VarChar(3000)
+  imageId         String?  @db.Uuid
+  durationMinutes Int?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  recipe Recipe @relation(fields: [recipeId], references: [id], onDelete: Cascade)
+
+  @@unique([recipeId, stepNumber])
+  @@index([recipeId, stepNumber])
+  @@map("recipe_steps")
+}
+
+model RecipeTag {
+  recipeId String @db.Uuid
+  tagId    String @db.Uuid
+
+  recipe Recipe @relation(fields: [recipeId], references: [id], onDelete: Cascade)
+  tag    Tag    @relation(fields: [tagId], references: [id], onDelete: Cascade)
+
+  @@id([recipeId, tagId])
+  @@index([tagId])
+  @@map("recipe_tags")
+}
+
+model Collection {
+  id          String             @id @default(uuid()) @db.Uuid
+  ownerId     String             @db.Uuid
+  name        String             @db.VarChar(120)
+  description String?            @db.VarChar(500)
+  visibility  CollectionVisibility @default(PRIVATE)
+  createdAt   DateTime           @default(now())
+  updatedAt   DateTime           @updatedAt
+
+  owner     User       @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  bookmarks Bookmark[]
+
+  @@unique([ownerId, name])
+  @@index([ownerId, visibility])
+  @@map("collections")
+}
+
+model Bookmark {
+  userId       String      @db.Uuid
+  recipeId     String      @db.Uuid
+  collectionId String?     @db.Uuid
+  createdAt    DateTime    @default(now())
+
+  user       User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  recipe     Recipe      @relation(fields: [recipeId], references: [id], onDelete: Cascade)
+  collection Collection? @relation(fields: [collectionId], references: [id], onDelete: SetNull)
+
+  @@id([userId, recipeId])
+  @@index([recipeId])
+  @@index([collectionId])
+  @@map("bookmarks")
+}
+
+model Report {
+  id          String       @id @default(uuid()) @db.Uuid
+  reporterId  String       @db.Uuid
+  recipeId    String?      @db.Uuid
+  commentId   String?      @db.Uuid
+  cooksnapId  String?      @db.Uuid
+  reason      ReportReason
+  description String?      @db.VarChar(1000)
+  status      ReportStatus @default(OPEN)
+  resolvedBy  String?      @db.Uuid
+  resolvedAt  DateTime?
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+
+  reporter User    @relation("ReportReporter", fields: [reporterId], references: [id], onDelete: Restrict)
+  resolver User?   @relation("ReportResolver", fields: [resolvedBy], references: [id], onDelete: SetNull)
+  recipe   Recipe? @relation(fields: [recipeId], references: [id], onDelete: Restrict)
+  comment  Comment? @relation(fields: [commentId], references: [id], onDelete: Restrict)
+  cooksnap Cooksnap? @relation(fields: [cooksnapId], references: [id], onDelete: Restrict)
+
+  @@index([status, createdAt])
+  @@index([recipeId, status])
+  @@index([reporterId, createdAt])
+  @@map("reports")
+}
+
+model AuditLog {
+  id         String   @id @default(uuid()) @db.Uuid
+  actorId    String   @db.Uuid
+  action     String   @db.VarChar(100)
+  targetType String   @db.VarChar(50)
+  targetId   String   @db.Uuid
+  details    Json?
+  createdAt  DateTime @default(now())
+
+  actor User @relation(fields: [actorId], references: [id], onDelete: Restrict)
+
+  @@index([targetType, targetId, createdAt])
+  @@index([actorId, createdAt])
+  @@map("audit_logs")
+}
+
+model Cooksnap {
+  id        String         @id @default(uuid()) @db.Uuid
+  recipeId  String         @db.Uuid
+  authorId  String         @db.Uuid
+  mediaAssetId String?     @unique @db.Uuid
+  imageUrl  String         @db.VarChar(2048)
+  caption   String?        @db.VarChar(1000)
+  status    CooksnapStatus @default(ACTIVE)
+  createdAt DateTime       @default(now())
+  updatedAt DateTime       @updatedAt
+  deletedAt DateTime?
+
+  recipe Recipe @relation(fields: [recipeId], references: [id], onDelete: Cascade)
+  author User   @relation(fields: [authorId], references: [id], onDelete: Restrict)
+  mediaAsset MediaAsset? @relation(fields: [mediaAssetId], references: [id], onDelete: Restrict)
+  reports Report[]
+
+  @@index([recipeId, status, createdAt])
+  @@index([authorId, status, createdAt])
+  @@map("cooksnaps")
+}
+
+model MediaAsset {
+  id                 String          @id @default(uuid()) @db.Uuid
+  ownerId            String          @db.Uuid
+  provider           String          @default("CLOUDINARY") @db.VarChar(30)
+  providerPublicId   String          @unique @db.VarChar(255)
+  secureUrl          String?         @db.VarChar(2048)
+  format             String?         @db.VarChar(20)
+  bytes              Int             @default(0)
+  status             MediaAssetStatus @default(UPLOADED)
+  createdAt          DateTime        @default(now())
+  attachedAt         DateTime?
+  deletedAt          DateTime?
+
+  owner    User      @relation(fields: [ownerId], references: [id], onDelete: Restrict)
+  cookSnap Cooksnap?
+  recipeCovers Recipe[] @relation("RecipeCover")
+
+  @@index([ownerId, status, createdAt])
+  @@index([status, createdAt])
+  @@map("media_assets")
+}
+
+model Notification {
+  id        String   @id @default(uuid()) @db.Uuid
+  userId    String   @db.Uuid
+  type      String   @db.VarChar(50)
+  title     String   @db.VarChar(150)
+  message   String   @db.VarChar(1000)
+  readAt    DateTime?
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, readAt, createdAt])
+  @@map("notifications")
+}
+
+model Comment {
+  id        String    @id @default(uuid()) @db.Uuid
+  recipeId  String    @db.Uuid
+  authorId  String    @db.Uuid
+  content   String    @db.VarChar(2000)
+  status    String    @default("ACTIVE") @db.VarChar(20)
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  recipe Recipe @relation(fields: [recipeId], references: [id], onDelete: Cascade)
+  author User   @relation(fields: [authorId], references: [id], onDelete: Restrict)
+  reports Report[]
+
+  @@index([recipeId, status, createdAt])
+  @@index([authorId, status, createdAt])
+  @@map("comments")
+}
+
+model Follow {
+  followerId  String @db.Uuid
+  followingId String @db.Uuid
+  createdAt DateTime @default(now())
+  follower User @relation("Follower", fields: [followerId], references: [id], onDelete: Cascade)
+  following User @relation("Following", fields: [followingId], references: [id], onDelete: Cascade)
+  @@id([followerId, followingId])
+  @@index([followingId, createdAt])
+  @@map("follows")
+}
+
+model Challenge {
+  id          String          @id @default(uuid()) @db.Uuid
+  createdById String          @db.Uuid
+  title       String          @db.VarChar(150)
+  description String?         @db.VarChar(2000)
+  bannerUrl   String?         @db.VarChar(2048)
+  startsAt    DateTime
+  endsAt      DateTime
+  status      ChallengeStatus @default(DRAFT)
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+
+  createdBy User             @relation("ChallengeCreator", fields: [createdById], references: [id], onDelete: Restrict)
+  entries   ChallengeEntry[]
+
+  @@index([status, startsAt])
+  @@index([endsAt])
+  @@map("challenges")
+}
+
+model ChallengeEntry {
+  id            String    @id @default(uuid()) @db.Uuid
+  challengeId   String    @db.Uuid
+  recipeId      String    @db.Uuid
+  submittedById String    @db.Uuid
+  createdAt     DateTime  @default(now())
+  removedAt     DateTime?
+  removedById   String?   @db.Uuid
+
+  challenge   Challenge @relation(fields: [challengeId], references: [id], onDelete: Cascade)
+  recipe      Recipe    @relation(fields: [recipeId], references: [id], onDelete: Restrict)
+  submittedBy User      @relation("ChallengeSubmitter", fields: [submittedById], references: [id], onDelete: Restrict)
+  removedBy   User?     @relation("ChallengeEntryRemover", fields: [removedById], references: [id], onDelete: SetNull)
+
+  @@unique([challengeId, recipeId])
+  @@index([challengeId, removedAt, createdAt])
+  @@index([recipeId])
+  @@map("challenge_entries")
+}
+
+model RecipeView {
+  id        String   @id @default(uuid()) @db.Uuid
+  recipeId  String   @db.Uuid
+  viewerKey String   @db.VarChar(120)
+  createdAt DateTime @default(now())
+
+  recipe Recipe @relation(fields: [recipeId], references: [id], onDelete: Cascade)
+
+  @@unique([recipeId, viewerKey])
+  @@index([recipeId, createdAt])
+  @@map("recipe_views")
+}

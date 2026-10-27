@@ -1,0 +1,23 @@
+---
+description: Quy tac Node.js Express REST API va nghiep vu cong dong
+globs: server/**/*.js
+alwaysApply: false
+---
+
+# Node.js Backend
+
+- Dung cau truc route -> controller -> service -> Prisma/repository.
+- Route khong chua business logic.
+- Moi body, params va query phai duoc validate o backend.
+- Moi resource co ownership phai kiem tra authentication va authorization.
+- Dung response format `{ data, meta, error }`.
+- Error phai co error code on dinh, khong de frontend phan tich message tu do.
+- Dung status code HTTP phu hop.
+- Dung transaction cho thao tac nhieu bang.
+- Khong tra password hash, refresh token hash hoac du lieu nhay cam.
+- Hash password bang thu vien tin cay, khong tu viet thuat toan hash.
+- Dung rate limit cho login, upload, comment va report.
+- Kiem tra mime type, dung luong va quyen so huu file upload.
+- Khong dung string concatenation cho SQL.
+- Ghi log loi o server, khong tra stack trace trong production.
+- Dung soft delete cho User, Recipe, Cooksnap va Comment.
