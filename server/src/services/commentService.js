@@ -1,12 +1,11 @@
 import { prisma } from '../lib/prisma.js';
 import { createNotification } from './notificationService.js';
-import { readableRecipeWhere } from '../utils/recipeAccess.js';
 
 function failure(message, code, statusCode) { const error = new Error(message); error.code = code; error.statusCode = statusCode; return error; }
 const author = { id: true, username: true, profile: { select: { displayName: true, avatarUrl: true } } };
 
 async function publicRecipe(recipeId) {
-  const recipe = await prisma.recipe.findFirst({ where: { id: recipeId, ...readableRecipeWhere }, select: { id: true, title: true, slug: true, authorId: true } });
+  const recipe = await prisma.recipe.findFirst({ where: { id: recipeId, status: 'PUBLISHED', visibility: 'PUBLIC', deletedAt: null, hiddenAt: null, author: { status: 'ACTIVE', deletedAt: null } }, select: { id: true, title: true, slug: true, authorId: true } });
   if (!recipe) throw failure('Recipe not found', 'RECIPE_NOT_FOUND', 404);
   return recipe;
 }

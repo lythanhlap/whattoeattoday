@@ -57,6 +57,7 @@ test('publishing incomplete recipe is rejected, then regular user enters review'
   const user = await createUser('publish');
   const created = await request(app).post('/api/v1/recipes').set('Authorization', `Bearer ${user.token}`).send({
     title: 'Đậu hũ sốt cà',
+    visibility: 'PUBLIC',
     ingredients: [{ displayName: 'Đậu hũ' }],
     steps: [{ instruction: 'Áp chảo đậu hũ.' }],
   });
@@ -467,72 +468,6 @@ test('user can list notifications and mark them read', async () => {
   const allRead = await request(app).post('/api/v1/me/notifications/read-all').set('Authorization', `Bearer ${user.token}`);
   assert.equal(allRead.status, 204);
   await prisma.notification.deleteMany({ where: { userId: { in: [user.id, admin.id] } } });
-});
-
-test('unlisted recipe stays reachable by direct link but out of discovery', async () => {
-  const author = await createUser('unlisteda');
-  const member = await createUser('unlistedm');
-  const editor = await createUser('unlistede');
-  await prisma.user.update({ where: { id: editor.id }, data: { role: 'EDITOR' } });
-  const token = `unlisted${suffix}`;
-  const cover = await prisma.mediaAsset.create({
-    data: {
-      ownerId: author.id,
-      providerPublicId: `test/${author.id}/unlisted-cover`,
-      secureUrl: 'https://res.cloudinary.com/demo/image/upload/unlisted-cover.jpg',
-      format: 'jpg',
-      bytes: 1024,
-    },
-  });
-
-  const created = await request(app).post('/api/v1/recipes').set('Authorization', `Bearer ${author.token}`).send({
-    title: `Món không liệt kê ${token}`,
-    description: 'Công thức chỉ chia sẻ qua đường dẫn.',
-    visibility: 'UNLISTED',
-    coverImageId: cover.id,
-    ingredients: [{ displayName: 'Nguyên liệu ẩn' }],
-    steps: [{ instruction: 'Nấu chín.' }],
-  });
-  assert.equal(created.status, 201);
-  assert.equal(created.body.data.recipe.visibility, 'UNLISTED');
-  const recipe = created.body.data.recipe;
-
-  const published = await request(app).post(`/api/v1/recipes/${recipe.id}/publish`).set('Authorization', `Bearer ${author.token}`);
-  assert.equal(published.status, 200);
-  assert.equal(published.body.data.recipe.status, 'PENDING_REVIEW');
-  assert.equal(published.body.data.recipe.visibility, 'UNLISTED');
-
-  const approved = await request(app).post(`/api/v1/moderation/recipes/${recipe.id}/review`).set('Authorization', `Bearer ${editor.token}`).send({ action: 'APPROVE' });
-  assert.equal(approved.status, 200);
-  assert.equal(approved.body.data.recipe.status, 'PUBLISHED');
-  assert.equal(approved.body.data.recipe.visibility, 'UNLISTED');
-
-  const guestDetail = await request(app).get(`/api/v1/recipes/${recipe.slug}`);
-  assert.equal(guestDetail.status, 200);
-  assert.equal(guestDetail.body.data.recipe.id, recipe.id);
-
-  const searched = await request(app).get('/api/v1/recipes').query({ q: token });
-  assert.equal(searched.status, 200);
-  assert.equal(searched.body.data.some((item) => item.id === recipe.id), false);
-  assert.equal(searched.body.meta.total, 0);
-
-  const listed = await request(app).get('/api/v1/recipes');
-  assert.equal(listed.body.data.some((item) => item.id === recipe.id), false);
-
-  const authorRecord = await prisma.user.findUnique({ where: { id: author.id }, select: { username: true } });
-  const profile = await request(app).get(`/api/v1/users/${authorRecord.username}`);
-  assert.equal(profile.status, 200);
-  assert.equal(profile.body.data.profile.recipes.some((item) => item.id === recipe.id), false);
-  assert.equal(profile.body.data.profile._count.recipes, 0);
-
-  const comment = await request(app).post(`/api/v1/recipes/${recipe.id}/comments`).set('Authorization', `Bearer ${member.token}`).send({ content: 'Vẫn bình luận được.' });
-  assert.equal(comment.status, 201);
-  const cooksnap = await request(app).post(`/api/v1/recipes/${recipe.id}/cooksnaps`).set('Authorization', `Bearer ${member.token}`).send({ imageUrl: 'https://storage.example/unlisted.jpg', caption: 'Đã nấu thử.' });
-  assert.equal(cooksnap.status, 201);
-  const bookmark = await request(app).post(`/api/v1/recipes/${recipe.id}/bookmark`).set('Authorization', `Bearer ${member.token}`).send({});
-  assert.equal(bookmark.status, 201);
-  const view = await request(app).post(`/api/v1/recipes/${recipe.id}/view`).set('User-Agent', 'unlisted-test');
-  assert.equal(view.status, 200);
 });
 
 test('search ranks title matches before ingredient and description matches', async () => {

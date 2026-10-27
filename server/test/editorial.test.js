@@ -39,6 +39,7 @@ async function createMediaAsset(ownerId, label) {
 async function createRecipe(user, title, extra = {}) {
   const response = await request(app).post('/api/v1/recipes').set('Authorization', `Bearer ${user.token}`).send({
     title,
+    visibility: 'PUBLIC',
     ingredients: [{ displayName: 'Nguyên liệu bí mật', quantity: '1', unit: 'phần' }],
     steps: [{ instruction: 'Nấu chín rồi thưởng thức.' }],
     ...extra,

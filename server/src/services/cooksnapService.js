@@ -1,18 +1,17 @@
 import { prisma } from '../lib/prisma.js';
 import { createNotification } from './notificationService.js';
-import { readableRecipeWhere } from '../utils/recipeAccess.js';
 
 function error(message, code, statusCode) { const result = new Error(message); result.code = code; result.statusCode = statusCode; return result; }
 const authorSelect = { id: true, username: true, profile: { select: { displayName: true, avatarUrl: true } } };
 
 export async function listCooksnaps(recipeId, userId) {
-  const recipe = await prisma.recipe.findFirst({ where: { id: recipeId, ...readableRecipeWhere }, select: { id: true } });
+  const recipe = await prisma.recipe.findFirst({ where: { id: recipeId, status: 'PUBLISHED', visibility: 'PUBLIC', deletedAt: null, hiddenAt: null, author: { status: 'ACTIVE', deletedAt: null } }, select: { id: true } });
   if (!recipe) throw error('Recipe not found', 'RECIPE_NOT_FOUND', 404);
   return prisma.cooksnap.findMany({ where: { recipeId, status: 'ACTIVE', deletedAt: null, ...(userId ? {} : { author: { status: 'ACTIVE', deletedAt: null } }) }, orderBy: { createdAt: 'desc' }, include: { author: { select: authorSelect } } });
 }
 
 export async function createCooksnap(authorId, recipeId, input) {
-  const recipe = await prisma.recipe.findFirst({ where: { id: recipeId, ...readableRecipeWhere }, select: { id: true, title: true, slug: true, authorId: true } });
+  const recipe = await prisma.recipe.findFirst({ where: { id: recipeId, status: 'PUBLISHED', visibility: 'PUBLIC', deletedAt: null, hiddenAt: null, author: { status: 'ACTIVE', deletedAt: null } }, select: { id: true, title: true, slug: true, authorId: true } });
   if (!recipe) throw error('Recipe not found', 'RECIPE_NOT_FOUND', 404);
   return prisma.$transaction(async (transaction) => {
     let imageUrl = input.imageUrl;

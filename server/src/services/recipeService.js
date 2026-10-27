@@ -1,7 +1,6 @@
 import { Prisma } from '@prisma/client';
 import { prisma } from '../lib/prisma.js';
 import { createRecipeSlug } from '../utils/slug.js';
-import { isReadableRecipe } from '../utils/recipeAccess.js';
 
 const recipeInclude = {
   author: { select: { id: true, username: true, status: true, profile: { select: { displayName: true, avatarUrl: true, bio: true } } } },
@@ -185,8 +184,8 @@ function assertCanManage(recipe, userId, userRole) {
   if (recipe.authorId !== userId && !['EDITOR', 'ADMIN'].includes(userRole)) throw forbidden();
 }
 
-function assertAccessibleRecipe(recipe) {
-  return isReadableRecipe(recipe);
+function assertPublicRecipe(recipe) {
+  return recipe.status === 'PUBLISHED' && (recipe.visibility === 'PUBLIC' || recipe.visibility === 'UNLISTED') && !recipe.deletedAt && !recipe.hiddenAt && recipe.author.status === 'ACTIVE';
 }
 
 function sanitizeRecipe(recipe) {
@@ -331,12 +330,10 @@ export async function publishRecipe(userId, userRole, id) {
   }
 
   const isTrustedPublisher = userRole === 'EDITOR' || userRole === 'ADMIN';
-  const visibility = recipe.visibility === 'UNLISTED' ? 'UNLISTED' : 'PUBLIC';
   const updatedRecipe = await prisma.recipe.update({
     where: { id },
     data: {
       status: isTrustedPublisher ? 'PUBLISHED' : 'PENDING_REVIEW',
-      visibility,
       publishedAt: isTrustedPublisher ? new Date() : null,
       reviewedAt: isTrustedPublisher ? new Date() : null,
       reviewNote: null,
@@ -395,7 +392,7 @@ export async function getRecipeBySlug(slug, userId, userRole) {
   const recipe = await prisma.recipe.findUnique({ where: { slug }, include: recipeInclude });
   if (!recipe || recipe.deletedAt) throw notFound();
   const canModerate = ['EDITOR', 'MODERATOR', 'ADMIN'].includes(userRole);
-  if (assertAccessibleRecipe(recipe) || recipe.authorId === userId || canModerate) return sanitizeRecipe(recipe);
+  if (assertPublicRecipe(recipe) || recipe.authorId === userId || canModerate) return sanitizeRecipe(recipe);
   throw notFound();
 }
 

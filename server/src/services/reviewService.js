@@ -11,7 +11,7 @@ const reviewInclude = {
 };
 
 const REVIEW_ACTIONS = {
-  APPROVE: { status: 'PUBLISHED', visibility: 'PUBLIC', type: 'RECIPE_APPROVED', audit: 'RECIPE_APPROVED', title: 'Công thức đã được duyệt' },
+  APPROVE: { status: 'PUBLISHED', type: 'RECIPE_APPROVED', audit: 'RECIPE_APPROVED', title: 'Công thức đã được duyệt' },
   REJECT: { status: 'REJECTED', visibility: 'PRIVATE', type: 'RECIPE_REJECTED', audit: 'RECIPE_REJECTED', title: 'Công thức bị từ chối' },
   REQUEST_CHANGES: { status: 'DRAFT', visibility: 'PRIVATE', type: 'RECIPE_CHANGES_REQUESTED', audit: 'RECIPE_CHANGES_REQUESTED', title: 'Công thức cần chỉnh sửa' },
 };
@@ -66,15 +66,12 @@ export async function reviewRecipe(actorId, actorRole, recipeId, input) {
 
   const now = new Date();
   const note = input.note?.trim() || null;
-  const visibility = input.action === 'APPROVE'
-    ? (recipe.visibility === 'UNLISTED' ? 'UNLISTED' : 'PUBLIC')
-    : action.visibility;
   const updated = await prisma.$transaction(async (transaction) => {
     const saved = await transaction.recipe.update({
       where: { id: recipeId },
       data: {
         status: action.status,
-        visibility,
+        visibility: action.visibility,
         publishedAt: input.action === 'APPROVE' ? now : null,
         reviewedAt: now,
         reviewNote: note,
