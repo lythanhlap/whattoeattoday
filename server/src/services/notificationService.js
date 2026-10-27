@@ -1,5 +1,9 @@
 import { prisma } from '../lib/prisma.js';
 
+export function createNotification(client, { userId, type, title, message, actionUrl = null }) {
+  return client.notification.create({ data: { userId, type, title, message, actionUrl } });
+}
+
 export async function listNotifications(userId, { page = 1, limit = 20 } = {}) {
   const take = Math.min(Math.max(Number(limit) || 20, 1), 50); const skip = (Math.max(Number(page) || 1, 1) - 1) * take;
   const [items, total, unread] = await prisma.$transaction([

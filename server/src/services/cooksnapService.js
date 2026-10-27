@@ -1,4 +1,5 @@
 import { prisma } from '../lib/prisma.js';
+import { createNotification } from './notificationService.js';
 
 function error(message, code, statusCode) { const result = new Error(message); result.code = code; result.statusCode = statusCode; return result; }
 const authorSelect = { id: true, username: true, profile: { select: { displayName: true, avatarUrl: true } } };
@@ -10,7 +11,7 @@ export async function listCooksnaps(recipeId, userId) {
 }
 
 export async function createCooksnap(authorId, recipeId, input) {
-  const recipe = await prisma.recipe.findFirst({ where: { id: recipeId, status: 'PUBLISHED', visibility: 'PUBLIC', deletedAt: null, hiddenAt: null, author: { status: 'ACTIVE', deletedAt: null } }, select: { id: true } });
+  const recipe = await prisma.recipe.findFirst({ where: { id: recipeId, status: 'PUBLISHED', visibility: 'PUBLIC', deletedAt: null, hiddenAt: null, author: { status: 'ACTIVE', deletedAt: null } }, select: { id: true, title: true, slug: true, authorId: true } });
   if (!recipe) throw error('Recipe not found', 'RECIPE_NOT_FOUND', 404);
   return prisma.$transaction(async (transaction) => {
     let imageUrl = input.imageUrl;
@@ -22,6 +23,16 @@ export async function createCooksnap(authorId, recipeId, input) {
     const cooksnap = await transaction.cooksnap.create({ data: { recipeId, authorId, imageUrl, mediaAssetId: input.mediaAssetId || null, caption: input.caption }, include: { author: { select: authorSelect } } });
     if (input.mediaAssetId) await transaction.mediaAsset.update({ where: { id: input.mediaAssetId }, data: { status: 'ATTACHED', attachedAt: new Date() } });
     await transaction.recipe.update({ where: { id: recipeId }, data: { cookSnapCount: { increment: 1 } } });
+    if (recipe.authorId !== authorId) {
+      const actorName = cooksnap.author.profile?.displayName || cooksnap.author.username;
+      await createNotification(transaction, {
+        userId: recipe.authorId,
+        type: 'RECIPE_COOKSNAP',
+        title: 'Cooksnap mới',
+        message: `${actorName} đã nấu thử công thức "${recipe.title}".`,
+        actionUrl: `/cong-thuc/${recipe.slug}`,
+      });
+    }
     return cooksnap;
   });
 }

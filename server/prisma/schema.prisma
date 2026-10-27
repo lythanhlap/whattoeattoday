@@ -434,6 +434,7 @@ model Notification {
   type      String   @db.VarChar(50)
   title     String   @db.VarChar(150)
   message   String   @db.VarChar(1000)
+  actionUrl String?  @db.VarChar(500)
   readAt    DateTime?
   createdAt DateTime @default(now())
 

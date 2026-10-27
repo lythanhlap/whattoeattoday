@@ -1,7 +1,34 @@
 import { Prisma } from '@prisma/client';
 import { prisma } from '../lib/prisma.js';
+import { createNotification } from './notificationService.js';
 function fail(message, code, statusCode) { const error = new Error(message); error.code = code; error.statusCode = statusCode; return error; }
-export async function follow(followerId, followingId) { if (followerId === followingId) throw fail('Cannot follow yourself', 'SELF_FOLLOW_FORBIDDEN', 422); const user = await prisma.user.findFirst({ where: { id: followingId, status: 'ACTIVE', deletedAt: null } }); if (!user) throw fail('User not found', 'USER_NOT_FOUND', 404); return prisma.follow.upsert({ where: { followerId_followingId: { followerId, followingId } }, create: { followerId, followingId }, update: {} }); }
+export async function follow(followerId, followingId) {
+  if (followerId === followingId) throw fail('Cannot follow yourself', 'SELF_FOLLOW_FORBIDDEN', 422);
+  const user = await prisma.user.findFirst({ where: { id: followingId, status: 'ACTIVE', deletedAt: null }, select: { id: true } });
+  if (!user) throw fail('User not found', 'USER_NOT_FOUND', 404);
+  const existing = await prisma.follow.findUnique({ where: { followerId_followingId: { followerId, followingId } } });
+  if (existing) return existing;
+  const follower = await prisma.user.findUnique({ where: { id: followerId }, select: { username: true, profile: { select: { displayName: true } } } });
+  const actorName = follower.profile?.displayName || follower.username;
+  try {
+    return await prisma.$transaction(async (transaction) => {
+      const created = await transaction.follow.create({ data: { followerId, followingId } });
+      await createNotification(transaction, {
+        userId: followingId,
+        type: 'NEW_FOLLOWER',
+        title: 'Người theo dõi mới',
+        message: `${actorName} đã theo dõi bạn.`,
+        actionUrl: `/nguoi-dung/${follower.username}`,
+      });
+      return created;
+    });
+  } catch (error) {
+    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
+      return prisma.follow.findUnique({ where: { followerId_followingId: { followerId, followingId } } });
+    }
+    throw error;
+  }
+}
 export async function unfollow(followerId, followingId) { await prisma.follow.deleteMany({ where: { followerId, followingId } }); }
 export async function getProfile(username, viewerId) {
   const publicRecipeWhere = { status: 'PUBLISHED', visibility: 'PUBLIC', deletedAt: null, hiddenAt: null, author: { status: 'ACTIVE', deletedAt: null } };
