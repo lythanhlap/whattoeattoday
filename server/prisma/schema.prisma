@@ -85,7 +85,7 @@ enum ChallengeStatus {
 }
 
 model User {
-  id              String         @id @default(uuid()) @db.Uuid
+  id              String         @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   email           String         @db.VarChar(320)
   username        String         @db.VarChar(30)
   passwordHash    String         @db.VarChar(255)
@@ -125,7 +125,7 @@ model User {
 }
 
 model UserProfile {
-  id          String   @id @default(uuid()) @db.Uuid
+  id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   userId      String   @unique @db.Uuid
   displayName String   @db.VarChar(100)
   avatarUrl   String?  @db.VarChar(2048)
@@ -139,7 +139,7 @@ model UserProfile {
 }
 
 model RefreshToken {
-  id         String    @id @default(uuid()) @db.Uuid
+  id         String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   userId     String    @db.Uuid
   tokenHash  String    @unique @db.VarChar(255)
   expiresAt  DateTime
@@ -159,7 +159,7 @@ model RefreshToken {
 }
 
 model Category {
-  id          String   @id @default(uuid()) @db.Uuid
+  id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   name        String   @db.VarChar(100)
   slug        String   @unique @db.VarChar(120)
   description String?  @db.VarChar(500)
@@ -173,7 +173,7 @@ model Category {
 }
 
 model Tag {
-  id        String   @id @default(uuid()) @db.Uuid
+  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   name      String   @db.VarChar(60)
   slug      String   @unique @db.VarChar(80)
   createdAt DateTime @default(now())
@@ -186,7 +186,7 @@ model Tag {
 }
 
 model Recipe {
-  id                String           @id @default(uuid()) @db.Uuid
+  id                String           @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   authorId          String           @db.Uuid
   categoryId        String?          @db.Uuid
   title             String           @db.VarChar(150)
@@ -221,6 +221,7 @@ model Recipe {
   coverImage  MediaAsset?        @relation("RecipeCover", fields: [coverImageId], references: [id], onDelete: SetNull)
   ingredients RecipeIngredient[]
   steps       RecipeStep[]
+  images      RecipeImage[]
   tags        RecipeTag[]
   bookmarks   Bookmark[]
   reports     Report[]
@@ -241,7 +242,7 @@ model Recipe {
 }
 
 model RecipeIngredient {
-  id          String   @id @default(uuid()) @db.Uuid
+  id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   recipeId    String   @db.Uuid
   ingredientId String? @db.Uuid
   displayName String   @db.VarChar(150)
@@ -258,7 +259,7 @@ model RecipeIngredient {
 }
 
 model RecipeStep {
-  id              String   @id @default(uuid()) @db.Uuid
+  id              String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   recipeId        String   @db.Uuid
   stepNumber      Int
   instruction     String   @db.VarChar(3000)
@@ -274,6 +275,21 @@ model RecipeStep {
   @@map("recipe_steps")
 }
 
+model RecipeImage {
+  id           String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  recipeId     String   @db.Uuid
+  mediaAssetId String   @unique @db.Uuid
+  sortOrder    Int
+  createdAt    DateTime @default(now())
+
+  recipe     Recipe     @relation(fields: [recipeId], references: [id], onDelete: Cascade)
+  mediaAsset MediaAsset @relation(fields: [mediaAssetId], references: [id], onDelete: Restrict)
+
+  @@unique([recipeId, mediaAssetId])
+  @@index([recipeId, sortOrder])
+  @@map("recipe_images")
+}
+
 model RecipeTag {
   recipeId String @db.Uuid
   tagId    String @db.Uuid
@@ -287,7 +303,7 @@ model RecipeTag {
 }
 
 model Collection {
-  id          String             @id @default(uuid()) @db.Uuid
+  id          String             @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   ownerId     String             @db.Uuid
   name        String             @db.VarChar(120)
   description String?            @db.VarChar(500)
@@ -320,7 +336,7 @@ model Bookmark {
 }
 
 model Report {
-  id          String       @id @default(uuid()) @db.Uuid
+  id          String       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   reporterId  String       @db.Uuid
   recipeId    String?      @db.Uuid
   commentId   String?      @db.Uuid
@@ -342,11 +358,13 @@ model Report {
   @@index([status, createdAt])
   @@index([recipeId, status])
   @@index([reporterId, createdAt])
+  @@index([commentId])
+  @@index([cooksnapId])
   @@map("reports")
 }
 
 model AuditLog {
-  id         String   @id @default(uuid()) @db.Uuid
+  id         String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   actorId    String   @db.Uuid
   action     String   @db.VarChar(100)
   targetType String   @db.VarChar(50)
@@ -362,7 +380,7 @@ model AuditLog {
 }
 
 model Cooksnap {
-  id        String         @id @default(uuid()) @db.Uuid
+  id        String         @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   recipeId  String         @db.Uuid
   authorId  String         @db.Uuid
   mediaAssetId String?     @unique @db.Uuid
@@ -384,7 +402,7 @@ model Cooksnap {
 }
 
 model MediaAsset {
-  id                 String          @id @default(uuid()) @db.Uuid
+  id                 String          @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   ownerId            String          @db.Uuid
   provider           String          @default("CLOUDINARY") @db.VarChar(30)
   providerPublicId   String          @unique @db.VarChar(255)
@@ -399,6 +417,7 @@ model MediaAsset {
   owner    User      @relation(fields: [ownerId], references: [id], onDelete: Restrict)
   cookSnap Cooksnap?
   recipeCovers Recipe[] @relation("RecipeCover")
+  recipeImages RecipeImage[]
 
   @@index([ownerId, status, createdAt])
   @@index([status, createdAt])
@@ -406,7 +425,7 @@ model MediaAsset {
 }
 
 model Notification {
-  id        String   @id @default(uuid()) @db.Uuid
+  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   userId    String   @db.Uuid
   type      String   @db.VarChar(50)
   title     String   @db.VarChar(150)
@@ -421,7 +440,7 @@ model Notification {
 }
 
 model Comment {
-  id        String    @id @default(uuid()) @db.Uuid
+  id        String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   recipeId  String    @db.Uuid
   authorId  String    @db.Uuid
   content   String    @db.VarChar(2000)
@@ -451,7 +470,7 @@ model Follow {
 }
 
 model Challenge {
-  id          String          @id @default(uuid()) @db.Uuid
+  id          String          @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   createdById String          @db.Uuid
   title       String          @db.VarChar(150)
   description String?         @db.VarChar(2000)
@@ -471,7 +490,7 @@ model Challenge {
 }
 
 model ChallengeEntry {
-  id            String    @id @default(uuid()) @db.Uuid
+  id            String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   challengeId   String    @db.Uuid
   recipeId      String    @db.Uuid
   submittedById String    @db.Uuid
@@ -491,7 +510,7 @@ model ChallengeEntry {
 }
 
 model RecipeView {
-  id        String   @id @default(uuid()) @db.Uuid
+  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   recipeId  String   @db.Uuid
   viewerKey String   @db.VarChar(120)
   createdAt DateTime @default(now())

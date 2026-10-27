@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { uploadImageToCloudinary } from '../../services/apiClient.js';
+import { optimizedImageUrl } from '../../utils/image.js';
 
 const blankIngredient = { displayName: '', quantity: '', unit: '', note: '' };
 const blankStep = { instruction: '', durationMinutes: '' };
@@ -10,6 +11,7 @@ function initialValues(recipe) {
     prepTimeMinutes: recipe?.prepTimeMinutes ?? '', cookTimeMinutes: recipe?.cookTimeMinutes ?? '',
     totalTimeMinutes: recipe?.totalTimeMinutes ?? '', servings: recipe?.servings ?? '',
     difficulty: recipe?.difficulty || 'EASY', visibility: recipe?.visibility || 'PRIVATE', categoryId: recipe?.categoryId || '', tagIds: recipe?.tags?.map((item) => item.tagId) || [],
+    imageIds: recipe?.images?.map((image) => image.mediaAssetId) || [],
     tips: recipe?.tips || '', substitutions: recipe?.substitutions || '', storageInstructions: recipe?.storageInstructions || '',
     ingredients: recipe?.ingredients?.length ? recipe.ingredients.map(({ displayName, quantity = '', unit = '', note = '' }) => ({ displayName, quantity, unit, note })) : [{ ...blankIngredient }],
     steps: recipe?.steps?.length ? recipe.steps.map(({ instruction, durationMinutes = '' }) => ({ instruction, durationMinutes })) : [{ ...blankStep }],
@@ -31,6 +33,7 @@ function buildPayload(values, visibility = values.visibility) {
     servings: numberOrNull(values.servings),
     ingredients: values.ingredients.filter((item) => item.displayName.trim()).map((item) => ({ ...item, displayName: item.displayName.trim() })),
     steps: values.steps.filter((item) => item.instruction.trim()).map((item) => ({ ...item, instruction: item.instruction.trim(), durationMinutes: numberOrNull(item.durationMinutes) })),
+    imageIds: values.imageIds,
   };
 }
 
@@ -39,6 +42,8 @@ export function RecipeForm({ recipe, categories = [], tags = [], isSubmitting, s
   const [errors, setErrors] = useState({});
   const [coverPreview, setCoverPreview] = useState(recipe?.coverImage?.secureUrl || '');
   const [coverState, setCoverState] = useState({ status: 'idle', error: null });
+  const [gallery, setGallery] = useState(() => (recipe?.images || []).map((image) => ({ id: image.mediaAssetId, url: image.mediaAsset?.secureUrl || '' })));
+  const [galleryState, setGalleryState] = useState({ status: 'idle', error: null });
   const update = (field, value) => setValues((current) => ({ ...current, [field]: value }));
   const updateList = (field, index, key, value) => setValues((current) => ({ ...current, [field]: current[field].map((item, itemIndex) => itemIndex === index ? { ...item, [key]: value } : item) }));
   const toggleTag = (tagId) => setValues((current) => ({
@@ -64,8 +69,31 @@ export function RecipeForm({ recipe, categories = [], tags = [], isSubmitting, s
     }
   };
 
-  const validate = () => {
-    const nextErrors = {};
+  const addGalleryFiles = async (files) => {
+    const selected = Array.from(files || []);
+    if (!selected.length) return;
+    if (!accessToken) { setGalleryState({ status: 'error', error: new Error('Hãy đăng nhập lại để upload ảnh.') }); return; }
+    const remaining = 6 - values.imageIds.length;
+    if (remaining <= 0) { setGalleryState({ status: 'error', error: new Error('Chỉ được thêm tối đa 6 ảnh bổ sung.') }); return; }
+    setGalleryState({ status: 'uploading', error: null });
+    try {
+      for (const file of selected.slice(0, remaining)) {
+        const uploaded = await uploadImageToCloudinary(file, accessToken, 'recipe');
+        setValues((current) => ({ ...current, imageIds: [...current.imageIds, uploaded.mediaAssetId] }));
+        setGallery((current) => [...current, { id: uploaded.mediaAssetId, url: uploaded.secure_url }]);
+      }
+      setGalleryState({ status: 'success', error: null });
+    } catch (error) {
+      setGalleryState({ status: 'error', error });
+    }
+  };
+
+  const removeGalleryImage = (mediaAssetId) => {
+    setGallery((current) => current.filter((image) => image.id !== mediaAssetId));
+    setValues((current) => ({ ...current, imageIds: current.imageIds.filter((id) => id !== mediaAssetId) }));
+  };
+
+  const validate = () => {    const nextErrors = {};
     if (values.title.trim().length < 3) nextErrors.title = 'Tiêu đề cần ít nhất 3 ký tự.';
     if (!values.ingredients.some((item) => item.displayName.trim())) nextErrors.ingredients = 'Cần ít nhất một nguyên liệu.';
     if (!values.steps.some((item) => item.instruction.trim())) nextErrors.steps = 'Cần ít nhất một bước thực hiện.';
@@ -100,6 +128,33 @@ export function RecipeForm({ recipe, categories = [], tags = [], isSubmitting, s
           <input value={values.coverImageId} onChange={(event) => update('coverImageId', event.target.value)} placeholder="UUID từ media storage" />
         </label>
         <span className="field-hint">Cần ảnh đại diện trước khi gửi xuất bản. Ảnh phải thuộc tài khoản của bạn.</span>
+      </fieldset>
+
+      <fieldset className="gallery-fieldset">
+        <legend>Ảnh bổ sung (tối đa 6)</legend>
+        {gallery.length > 0 && (
+          <ul className="gallery-editor-list">
+            {gallery.map((image) => (
+              <li key={image.id}>
+                {image.url && <img src={optimizedImageUrl(image.url, { width: 240, height: 180 })} alt="Ảnh bổ sung đã chọn" width="240" height="180" />}
+                <button className="icon-button" type="button" aria-label="Xóa ảnh bổ sung" onClick={() => removeGalleryImage(image.id)}>×</button>
+              </li>
+            ))}
+          </ul>
+        )}
+        <label>
+          Thêm ảnh JPG, PNG hoặc WEBP
+          <input
+            type="file"
+            accept="image/jpeg,image/png,image/webp"
+            multiple
+            disabled={values.imageIds.length >= 6}
+            onChange={(event) => { addGalleryFiles(event.target.files); event.target.value = ''; }}
+          />
+        </label>
+        {galleryState.status === 'uploading' && <p className="field-hint" role="status">Đang upload ảnh...</p>}
+        {galleryState.error && <p className="field-error">{galleryState.error.message}</p>}
+        <span className="field-hint">Ảnh bổ sung là tùy chọn, hiển thị trong thư viện ảnh của công thức.</span>
       </fieldset>
 
       <div className="form-grid">

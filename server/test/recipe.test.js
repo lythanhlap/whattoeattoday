@@ -336,8 +336,62 @@ test('cooksnap attaches only a media asset owned by the submitting member', asyn
   assert.ok(state.attachedAt);
 });
 
-test('Cloudinary provider verification works with a fetch stub', async () => {
-  const owner = await createUser('cloudstub');
+test('recipe gallery stores up to six owned media assets and can be replaced', async () => {
+  const author = await createUser('galleryauthor');
+  const other = await createUser('galleryother');
+  const makeAsset = (ownerId, name) => prisma.mediaAsset.create({
+    data: { ownerId, providerPublicId: `test/${ownerId}/${name}`, secureUrl: `https://res.cloudinary.com/demo/image/upload/${name}.jpg`, format: 'jpg', bytes: 1024 },
+  });
+  const [first, second, third] = await Promise.all([
+    makeAsset(author.id, 'gallery-1'),
+    makeAsset(author.id, 'gallery-2'),
+    makeAsset(author.id, 'gallery-3'),
+  ]);
+  const foreign = await makeAsset(other.id, 'gallery-foreign');
+
+  const created = await request(app).post('/api/v1/recipes').set('Authorization', `Bearer ${author.token}`).send({
+    title: 'Gallery fixture',
+    ingredients: [{ displayName: 'Rau' }],
+    steps: [{ instruction: 'Nấu.' }],
+    imageIds: [first.id, second.id],
+  });
+  assert.equal(created.status, 201);
+  assert.deepEqual(created.body.data.recipe.images.map((image) => image.mediaAssetId), [first.id, second.id]);
+  assert.equal(created.body.data.recipe.images[0].mediaAsset.secureUrl, first.secureUrl);
+  const attached = await prisma.mediaAsset.findMany({ where: { id: { in: [first.id, second.id] } }, select: { status: true } });
+  assert.ok(attached.every((asset) => asset.status === 'ATTACHED'));
+
+  const foreignAttempt = await request(app).post('/api/v1/recipes').set('Authorization', `Bearer ${author.token}`).send({
+    title: 'Foreign gallery fixture',
+    ingredients: [{ displayName: 'Rau' }],
+    steps: [{ instruction: 'Nấu.' }],
+    imageIds: [foreign.id],
+  });
+  assert.equal(foreignAttempt.status, 422);
+  assert.equal(foreignAttempt.body.error.code, 'RECIPE_GALLERY_INVALID');
+
+  const tooMany = await request(app).post('/api/v1/recipes').set('Authorization', `Bearer ${author.token}`).send({
+    title: 'Too many gallery fixture',
+    ingredients: [{ displayName: 'Rau' }],
+    steps: [{ instruction: 'Nấu.' }],
+    imageIds: ['1', '2', '3', '4', '5', '6', '7'],
+  });
+  assert.equal(tooMany.status, 422);
+
+  const replaced = await request(app).patch(`/api/v1/recipes/${created.body.data.recipe.id}`).set('Authorization', `Bearer ${author.token}`).send({ imageIds: [third.id] });
+  assert.equal(replaced.status, 200);
+  assert.deepEqual(replaced.body.data.recipe.images.map((image) => image.mediaAssetId), [third.id]);
+
+  const listed = await request(app).get(`/api/v1/recipes/${created.body.data.recipe.slug}`).set('Authorization', `Bearer ${author.token}`);
+  assert.equal(listed.status, 200);
+  assert.deepEqual(listed.body.data.recipe.images.map((image) => image.mediaAssetId), [third.id]);
+
+  const cleared = await request(app).patch(`/api/v1/recipes/${created.body.data.recipe.id}`).set('Authorization', `Bearer ${author.token}`).send({ imageIds: [] });
+  assert.equal(cleared.status, 200);
+  assert.equal(cleared.body.data.recipe.images.length, 0);
+});
+
+test('Cloudinary provider verification works with a fetch stub', async () => {  const owner = await createUser('cloudstub');
   const publicId = `recipe-community/cooksnaps/${owner.id}/stub-image`;
   const asset = await prisma.mediaAsset.create({ data: { ownerId: owner.id, providerPublicId: publicId } });
   const originalFetch = globalThis.fetch;

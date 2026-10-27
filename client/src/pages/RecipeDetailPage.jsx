@@ -328,6 +328,27 @@ export function RecipeDetailPage() {
         <span><strong>{recipe.viewCount ?? 0}</strong> lượt xem</span>
       </div>
 
+      {recipe.images?.length > 0 && (
+        <section className="recipe-gallery" aria-label="Ảnh bổ sung của công thức">
+          <h2>Ảnh bổ sung</h2>
+          <ul className="recipe-gallery-grid">
+            {recipe.images.map((image, index) => image.mediaAsset?.secureUrl && (
+              <li key={image.id}>
+                <a href={image.mediaAsset.secureUrl} target="_blank" rel="noreferrer">
+                  <img
+                    src={optimizedImageUrl(image.mediaAsset.secureUrl, { width: 480, height: 360 })}
+                    alt={`Ảnh bổ sung ${index + 1} của ${recipe.title}`}
+                    loading="lazy"
+                    width="480"
+                    height="360"
+                  />
+                </a>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
+
       <div className="detail-columns">
         <section>
           <div className="ingredient-heading">

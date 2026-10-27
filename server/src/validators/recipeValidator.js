@@ -1,5 +1,6 @@
 const DIFFICULTIES = new Set(['EASY', 'MEDIUM', 'HARD']);
 const VISIBILITIES = new Set(['PUBLIC', 'PRIVATE', 'UNLISTED']);
+const MAX_GALLERY_IMAGES = 6;
 
 function positiveInteger(value, field, errors, { allowNull = true } = {}) {
   if (value === undefined || (value === null && allowNull)) return;
@@ -36,6 +37,7 @@ export function validateRecipeInput(body, { partial = false } = {}) {
   const ingredients = normalizeList(body.ingredients, 'ingredients', errors);
   const steps = normalizeList(body.steps, 'steps', errors);
   const tagIds = normalizeList(body.tagIds, 'tagIds', errors);
+  const imageIds = normalizeList(body.imageIds, 'imageIds', errors);
 
   if (!partial || ingredients !== undefined) {
     if (!partial && (!ingredients || ingredients.length === 0)) errors.ingredients = 'At least one ingredient is required';
@@ -51,6 +53,7 @@ export function validateRecipeInput(body, { partial = false } = {}) {
     });
   }
   if (tagIds && (tagIds.some((id) => typeof id !== 'string') || new Set(tagIds).size !== tagIds.length)) errors.tagIds = 'Tag ids must be unique strings';
+  if (imageIds && (imageIds.length > MAX_GALLERY_IMAGES || imageIds.some((id) => typeof id !== 'string') || new Set(imageIds).size !== imageIds.length)) errors.imageIds = `Gallery images must be up to ${MAX_GALLERY_IMAGES} unique media asset ids`;
 
   if (Object.keys(errors).length > 0) {
     const error = new Error('Validation failed');
@@ -67,6 +70,7 @@ export function validateRecipeInput(body, { partial = false } = {}) {
     ...(ingredients ? { ingredients } : {}),
     ...(steps ? { steps } : {}),
     ...(tagIds ? { tagIds } : {}),
+    ...(imageIds ? { imageIds } : {}),
   };
 }
 

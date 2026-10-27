@@ -8,6 +8,10 @@ const recipeInclude = {
   coverImage: { select: { id: true, secureUrl: true, format: true } },
   ingredients: { orderBy: { sortOrder: 'asc' } },
   steps: { orderBy: { stepNumber: 'asc' } },
+  images: {
+    orderBy: { sortOrder: 'asc' },
+    include: { mediaAsset: { select: { id: true, secureUrl: true, format: true } } },
+  },
   tags: { include: { tag: true } },
 };
 
@@ -158,6 +162,7 @@ function nestedRecipeData(input) {
       durationMinutes: item.durationMinutes ?? null,
     })) } : undefined,
     tags: input.tagIds ? { create: input.tagIds.map((tagId) => ({ tagId })) } : undefined,
+    images: input.imageIds?.length ? { create: input.imageIds.map((mediaAssetId, index) => ({ mediaAssetId, sortOrder: index })) } : undefined,
   };
 }
 
@@ -216,10 +221,44 @@ async function attachCoverImage(transaction, coverImageId) {
   });
 }
 
+async function assertGalleryImages(transaction, userId, imageIds, currentRecipeId = null) {
+  if (!imageIds?.length) return;
+  if (imageIds.length > 6 || imageIds.some((id) => typeof id !== 'string')) {
+    const error = new Error('Gallery images must be up to 6 media asset ids');
+    error.statusCode = 422;
+    error.code = 'RECIPE_GALLERY_INVALID';
+    throw error;
+  }
+  const owned = await transaction.mediaAsset.count({
+    where: { id: { in: imageIds }, ownerId: userId, status: { in: ['UPLOADED', 'ATTACHED'] } },
+  });
+  const usedElsewhere = await transaction.recipeImage.count({
+    where: {
+      mediaAssetId: { in: imageIds },
+      ...(currentRecipeId ? { recipeId: { not: currentRecipeId } } : {}),
+    },
+  });
+  if (owned !== imageIds.length || usedElsewhere > 0) {
+    const error = new Error('Gallery images must be uploaded media assets owned by the author');
+    error.statusCode = 422;
+    error.code = 'RECIPE_GALLERY_INVALID';
+    throw error;
+  }
+}
+
+async function attachGalleryImages(transaction, imageIds) {
+  if (!imageIds?.length) return;
+  await transaction.mediaAsset.updateMany({
+    where: { id: { in: imageIds }, status: 'UPLOADED' },
+    data: { status: 'ATTACHED', attachedAt: new Date() },
+  });
+}
+
 export async function createRecipe(userId, input) {
   try {
     return await prisma.$transaction(async (transaction) => {
       await assertCoverImage(transaction, userId, input.coverImageId);
+      await assertGalleryImages(transaction, userId, input.imageIds);
       const recipe = await transaction.recipe.create({
         data: {
           ...recipeData(input),
@@ -230,6 +269,7 @@ export async function createRecipe(userId, input) {
         include: recipeInclude,
       });
       await attachCoverImage(transaction, input.coverImageId);
+      await attachGalleryImages(transaction, input.imageIds);
       return sanitizeRecipe(recipe);
     });
   } catch (error) {
@@ -263,9 +303,15 @@ export async function updateRecipe(userId, userRole, id, input) {
       await transaction.recipeTag.deleteMany({ where: { recipeId: id } });
       data.tags = nestedRecipeData(input).tags;
     }
+    if (input.imageIds !== undefined) {
+      await assertGalleryImages(transaction, current.authorId, input.imageIds, id);
+      await transaction.recipeImage.deleteMany({ where: { recipeId: id } });
+      data.images = nestedRecipeData(input).images;
+    }
     if (input.status === undefined && current.status === 'PUBLISHED') data.status = 'PENDING_REVIEW';
     const recipe = await transaction.recipe.update({ where: { id }, data, include: recipeInclude });
     await attachCoverImage(transaction, input.coverImageId);
+    await attachGalleryImages(transaction, input.imageIds);
     return sanitizeRecipe(recipe);
   });
 }
