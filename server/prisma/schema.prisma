@@ -448,18 +448,22 @@ model Comment {
   id        String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   recipeId  String    @db.Uuid
   authorId  String    @db.Uuid
+  parentId  String?   @db.Uuid
   content   String    @db.VarChar(2000)
   status    String    @default("ACTIVE") @db.VarChar(20)
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
   deletedAt DateTime?
 
-  recipe Recipe @relation(fields: [recipeId], references: [id], onDelete: Cascade)
-  author User   @relation(fields: [authorId], references: [id], onDelete: Restrict)
+  recipe  Recipe    @relation(fields: [recipeId], references: [id], onDelete: Cascade)
+  author  User      @relation(fields: [authorId], references: [id], onDelete: Restrict)
+  parent  Comment?  @relation("CommentReplies", fields: [parentId], references: [id], onDelete: Cascade)
+  replies Comment[] @relation("CommentReplies")
   reports Report[]
 
   @@index([recipeId, status, createdAt])
   @@index([authorId, status, createdAt])
+  @@index([parentId, status, createdAt])
   @@map("comments")
 }
 
