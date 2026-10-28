@@ -8,6 +8,7 @@ export function AuthProvider({ children }) {
   const [status, setStatus] = useState('loading');
   const [error, setError] = useState(null);
   const accessTokenRef = useRef(null);
+  const refreshPromiseRef = useRef(null);
 
   const applySession = useCallback((session) => {
     accessTokenRef.current = session?.accessToken || null;
@@ -17,17 +18,24 @@ export function AuthProvider({ children }) {
   }, []);
 
   const refreshSession = useCallback(async () => {
-    try {
-      const session = await authApi.refresh();
-      applySession(session);
-      return session;
-    } catch (refreshError) {
-      accessTokenRef.current = null;
-      setUser(null);
-      setStatus('unauthenticated');
-      if (refreshError.status !== 401) setError(refreshError.message);
-      return null;
-    }
+    if (refreshPromiseRef.current) return refreshPromiseRef.current;
+    const promise = (async () => {
+      try {
+        const session = await authApi.refresh();
+        applySession(session);
+        return session;
+      } catch (refreshError) {
+        accessTokenRef.current = null;
+        setUser(null);
+        setStatus('unauthenticated');
+        if (refreshError.status !== 401) setError(refreshError.message);
+        return null;
+      } finally {
+        refreshPromiseRef.current = null;
+      }
+    })();
+    refreshPromiseRef.current = promise;
+    return promise;
   }, [applySession]);
 
   useEffect(() => {
@@ -77,6 +85,17 @@ export function AuthProvider({ children }) {
     setUser((current) => ({ ...current, ...nextUser }));
   }, []);
 
+  const signOutAll = useCallback(async () => {
+    try {
+      await authApi.logoutAll(accessTokenRef.current);
+    } finally {
+      accessTokenRef.current = null;
+      setUser(null);
+      setError(null);
+      setStatus('unauthenticated');
+    }
+  }, []);
+
   const value = useMemo(() => ({
     user,
     status,
@@ -87,9 +106,10 @@ export function AuthProvider({ children }) {
     signIn,
     signUp,
     signOut,
+    signOutAll,
     refreshSession,
     updateUser,
-  }), [error, refreshSession, signIn, signOut, signUp, status, user, updateUser]);
+  }), [error, refreshSession, signIn, signOut, signOutAll, signUp, status, user, updateUser]);
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }

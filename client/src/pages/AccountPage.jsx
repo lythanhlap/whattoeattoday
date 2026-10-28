@@ -5,6 +5,7 @@ import { useAuth } from '../features/auth/AuthContext.jsx';
 import { EmptyState, ErrorState, LoadingState } from '../features/recipes/RecipeStates.jsx';
 import { RecipeCard } from '../features/recipes/RecipeCard.jsx';
 import { optimizedImageUrl } from '../utils/image.js';
+import { Icon } from '../components/Icon.jsx';
 
 const STATUS_LABELS = {
   DRAFT: 'Bản nháp',
@@ -14,9 +15,17 @@ const STATUS_LABELS = {
   ARCHIVED: 'Đã lưu trữ',
 };
 
+const ROLE_LABELS = {
+  USER: 'Thành viên',
+  EDITOR: 'Biên tập viên',
+  MODERATOR: 'Kiểm duyệt viên',
+  ADMIN: 'Quản trị viên',
+};
+
 export function AccountPage() {
-  const { user, accessToken, signOut, updateUser } = useAuth();
+  const { user, accessToken, signOut, signOutAll, updateUser } = useAuth();
   const [tab, setTab] = useState('profile');
+  const [signingOutAll, setSigningOutAll] = useState(false);
   const [bookmarks, setBookmarks] = useState([]);
   const [collections, setCollections] = useState([]);
   const [recipes, setRecipes] = useState([]);
@@ -119,21 +128,46 @@ export function AccountPage() {
     try { await communityApi.removeBookmark(recipeId, accessToken); load(); } catch (error) { setListError(error); }
   };
 
+  const handleSignOutAll = async () => {
+    if (!window.confirm('Đăng xuất khỏi mọi thiết bị? Bạn sẽ cần đăng nhập lại ở tất cả nơi đã đăng nhập.')) return;
+    setSigningOutAll(true);
+    try { await signOutAll(); } finally { setSigningOutAll(false); }
+  };
+
   return (
     <section className="account-page" aria-labelledby="account-title">
       <div className="account-header">
-        <div>
-          <p className="eyebrow">Tài khoản của bạn</p>
-          <h1 id="account-title">Xin chào, {user?.profile?.displayName || user?.username}</h1>
-          <p className="lead">Quản lý hồ sơ, mật khẩu, công thức và bộ sưu tập cá nhân.</p>
+        <div className="account-identity">
+          {user?.profile?.avatarUrl ? (
+            <img className="account-avatar" src={user.profile.avatarUrl} alt="" width="72" height="72" />
+          ) : (
+            <span className="account-avatar account-avatar-initial" aria-hidden="true">
+              {(user?.profile?.displayName || user?.username || 'B').slice(0, 1).toUpperCase()}
+            </span>
+          )}
+          <div>
+            <p className="eyebrow">Tài khoản của bạn</p>
+            <h1 id="account-title">{user?.profile?.displayName || user?.username}</h1>
+            <p className="lead">Quản lý hồ sơ, mật khẩu, công thức và bộ sưu tập cá nhân.</p>
+          </div>
         </div>
-        <button className="secondary-button" type="button" onClick={signOut}>Đăng xuất</button>
+        <div className="account-header-actions">
+          <button className="secondary-button" type="button" onClick={signOut}>
+            <Icon name="logout" size={16} />Đăng xuất
+          </button>
+          <button className="danger-button" type="button" disabled={signingOutAll} onClick={handleSignOutAll}>
+            {signingOutAll ? 'Đang xử lý...' : 'Đăng xuất mọi thiết bị'}
+          </button>
+        </div>
       </div>
 
       <div className="account-summary">
         <div><span className="summary-label">Username</span><strong>@{user?.username}</strong></div>
         <div><span className="summary-label">Email</span><strong>{user?.email}</strong></div>
-        <div><span className="summary-label">Trạng thái</span><strong>{user?.status}</strong></div>
+        <div><span className="summary-label">Vai trò</span><strong>{ROLE_LABELS[user?.role] || 'Thành viên'}</strong></div>
+        <div><span className="summary-label">Công thức</span><strong>{recipes.length}</strong></div>
+        <div><span className="summary-label">Đã lưu</span><strong>{bookmarks.length}</strong></div>
+        <div><span className="summary-label">Bộ sưu tập</span><strong>{collections.length}</strong></div>
       </div>
 
       <div className="tab-list" role="tablist" aria-label="Quản lý tài khoản">
