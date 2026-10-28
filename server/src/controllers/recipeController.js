@@ -1,6 +1,6 @@
-import { listRecipes, createRecipe, updateRecipe, publishRecipe, getRecipeBySlug, deleteRecipe } from '../services/recipeService.js';
+import { listRecipes, createRecipe, updateRecipe, publishRecipe, getRecipeBySlug, deleteRecipe, suggestRecipes } from '../services/recipeService.js';
 import { recordRecipeView } from '../services/recipeViewService.js';
-import { validateRecipeInput, validateRecipeQuery } from '../validators/recipeValidator.js';
+import { validateRecipeInput, validateRecipeQuery, validateSuggestionQuery } from '../validators/recipeValidator.js';
 
 export async function createRecipeController(request, response, next) {
   try {
@@ -23,8 +23,15 @@ export async function listRecipesController(request, response, next) {
   } catch (error) { next(error); }
 }
 
-export async function getRecipeController(request, response, next) {
+export async function suggestRecipesController(request, response, next) {
   try {
+    const { q, limit } = validateSuggestionQuery(request.query);
+    const suggestions = await suggestRecipes({ q, limit });
+    response.status(200).json({ data: suggestions, meta: { query: q, limit }, error: null });
+  } catch (error) { next(error); }
+}
+
+export async function getRecipeController(request, response, next) {  try {
     const recipe = await getRecipeBySlug(request.params.slug, request.auth?.userId, request.auth?.role);
     response.status(200).json({ data: { recipe }, meta: {}, error: null });
   } catch (error) { next(error); }

@@ -1,12 +1,14 @@
 import { Router } from 'express';
-import { createRecipeController, deleteRecipeController, getRecipeController, listRecipesController, publishRecipeController, recordRecipeViewController, updateRecipeController } from '../controllers/recipeController.js';
+import { createRecipeController, deleteRecipeController, getRecipeController, listRecipesController, publishRecipeController, recordRecipeViewController, suggestRecipesController, updateRecipeController } from '../controllers/recipeController.js';
 import { requireAuth } from '../middlewares/authMiddleware.js';
 import { optionalAuth } from '../middlewares/optionalAuthMiddleware.js';
+import { rateLimit } from '../middlewares/rateLimit.js';
 
 export const recipeRoutes = Router();
 
 recipeRoutes.get('/', optionalAuth, listRecipesController);
 recipeRoutes.post('/', requireAuth, createRecipeController);
+recipeRoutes.get('/suggestions', rateLimit({ max: 120 }), suggestRecipesController);
 recipeRoutes.post('/:id/view', optionalAuth, recordRecipeViewController);
 recipeRoutes.get('/:slug', optionalAuth, getRecipeController);
 recipeRoutes.patch('/:id', requireAuth, updateRecipeController);

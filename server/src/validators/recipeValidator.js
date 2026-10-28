@@ -74,8 +74,7 @@ export function validateRecipeInput(body, { partial = false } = {}) {
   };
 }
 
-export function validateRecipeQuery(query) {
-  const page = Number(query.page || 1);
+export function validateRecipeQuery(query) {  const page = Number(query.page || 1);
   const limit = Number(query.limit || 20);
   const maxCookTime = query.maxCookTime === undefined ? undefined : Number(query.maxCookTime);
   const tags = query.tags ? String(query.tags).split(',').map((tag) => tag.trim()).filter(Boolean) : undefined;
@@ -107,4 +106,27 @@ export function validateRecipeQuery(query) {
     throw error;
   }
   return { ...query, q, ingredient, diet, featured, page, limit, maxCookTime, tags, hasCooksnap, sort: query.sort || 'newest' };
+}
+
+export function validateSuggestionQuery(query) {
+  const errors = {};
+  const q = typeof query.q === 'string' ? query.q.trim() : '';
+
+  if (q.length < 2 || q.length > 100) errors.q = 'Search query must be 2 to 100 characters';
+
+  let limit = 6;
+  if (query.limit !== undefined && query.limit !== '') {
+    limit = Number(query.limit);
+    if (!Number.isInteger(limit) || limit < 1 || limit > 10) errors.limit = 'Limit must be an integer between 1 and 10';
+  }
+
+  if (Object.keys(errors).length) {
+    const error = new Error('Invalid suggestion query');
+    error.statusCode = 422;
+    error.code = 'VALIDATION_ERROR';
+    error.details = errors;
+    throw error;
+  }
+
+  return { q, limit };
 }

@@ -388,8 +388,56 @@ export async function listRecipes({ page = 1, limit = 20, q, ingredient, categor
   return { items: items.map(sanitizeRecipe), meta: { page: Math.floor(skip / take) + 1, limit: take, total, totalPages: Math.ceil(total / take) } };
 }
 
-export async function getRecipeBySlug(slug, userId, userRole) {
-  const recipe = await prisma.recipe.findUnique({ where: { slug }, include: recipeInclude });
+export async function suggestRecipes({ q, limit }) {
+  const term = q.trim();
+  const rows = await prisma.$queryRaw(Prisma.sql`
+    SELECT label, slug, type
+    FROM (
+      SELECT r.title AS label,
+        r.slug AS slug,
+        'RECIPE'::text AS type,
+        CASE WHEN immutable_unaccent(r.title) ILIKE immutable_unaccent(${term}) || '%' THEN 0 ELSE 1 END AS prefix_rank,
+        similarity(immutable_unaccent(r.title), immutable_unaccent(${term})) AS score,
+        r."publishedAt" AS sort_time
+      FROM recipes r
+      WHERE r.status = 'PUBLISHED'
+        AND r.visibility = 'PUBLIC'
+        AND r."deletedAt" IS NULL
+        AND r."hiddenAt" IS NULL
+        AND EXISTS (SELECT 1 FROM users u WHERE u.id = r."authorId" AND u.status = 'ACTIVE' AND u."deletedAt" IS NULL)
+        AND (
+          immutable_unaccent(r.title) ILIKE '%' || immutable_unaccent(${term}) || '%'
+          OR immutable_unaccent(r.title) % immutable_unaccent(${term})
+        )
+      UNION ALL
+      SELECT t.name, t.slug, 'TAG'::text,
+        CASE WHEN immutable_unaccent(t.name) ILIKE immutable_unaccent(${term}) || '%' THEN 0 ELSE 1 END,
+        similarity(immutable_unaccent(t.name), immutable_unaccent(${term})),
+        NULL::timestamp
+      FROM tags t
+      WHERE immutable_unaccent(t.name) ILIKE '%' || immutable_unaccent(${term}) || '%'
+        OR immutable_unaccent(t.name) % immutable_unaccent(${term})
+      UNION ALL
+      SELECT c.name, c.slug, 'CATEGORY'::text,
+        CASE WHEN immutable_unaccent(c.name) ILIKE immutable_unaccent(${term}) || '%' THEN 0 ELSE 1 END,
+        similarity(immutable_unaccent(c.name), immutable_unaccent(${term})),
+        NULL::timestamp
+      FROM categories c
+      WHERE immutable_unaccent(c.name) ILIKE '%' || immutable_unaccent(${term}) || '%'
+        OR immutable_unaccent(c.name) % immutable_unaccent(${term})
+    ) matches
+    ORDER BY
+      CASE matches.type WHEN 'RECIPE' THEN 0 WHEN 'TAG' THEN 1 ELSE 2 END,
+      matches.prefix_rank,
+      matches.score DESC,
+      matches.sort_time DESC NULLS LAST,
+      matches.label ASC
+    LIMIT ${limit}
+  `);
+  return rows.map((row) => ({ type: row.type, label: row.label, slug: row.slug }));
+}
+
+export async function getRecipeBySlug(slug, userId, userRole) {  const recipe = await prisma.recipe.findUnique({ where: { slug }, include: recipeInclude });
   if (!recipe || recipe.deletedAt) throw notFound();
   const canModerate = ['EDITOR', 'MODERATOR', 'ADMIN'].includes(userRole);
   if (assertPublicRecipe(recipe) || recipe.authorId === userId || canModerate) return sanitizeRecipe(recipe);
