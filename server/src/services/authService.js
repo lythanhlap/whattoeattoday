@@ -13,6 +13,9 @@ import { currentUserSelect, toUserDto } from '../utils/userDto.js';
 import { reactivateIfExpired } from './accountStatusService.js';
 
 const INVALID_CREDENTIALS = 'Invalid email/username or password';
+// Compared against even when the account is missing so response time does not
+// reveal whether an email or username exists.
+const DUMMY_PASSWORD_HASH = '$2b$10$l4VaO9DVKvOKCv.fyQm/h.baLp9BnWNKYHDCepr7/QM.TIOYVVUUy';
 
 function authError() {
   const error = new Error(INVALID_CREDENTIALS);
@@ -87,7 +90,8 @@ export async function login(input, metadata) {
     select: { ...currentUserSelect, passwordHash: true, deletedAt: true, suspendedUntil: true },
   });
 
-  if (!user || !(await bcrypt.compare(input.password, user.passwordHash))) throw authError();
+  const passwordMatches = await bcrypt.compare(input.password, user?.passwordHash || DUMMY_PASSWORD_HASH);
+  if (!user || !passwordMatches) throw authError();
   user = await reactivateIfExpired(user);
   assertActiveUser(user);
 
