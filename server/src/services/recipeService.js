@@ -437,7 +437,8 @@ export async function suggestRecipes({ q, limit }) {
   return rows.map((row) => ({ type: row.type, label: row.label, slug: row.slug }));
 }
 
-export async function getRecipeBySlug(slug, userId, userRole) {  const recipe = await prisma.recipe.findUnique({ where: { slug }, include: recipeInclude });
+export async function getRecipeBySlug(slug, userId, userRole) {
+  const recipe = await prisma.recipe.findUnique({ where: { slug }, include: recipeInclude });
   if (!recipe || recipe.deletedAt) throw notFound();
   const canModerate = ['EDITOR', 'MODERATOR', 'ADMIN'].includes(userRole);
   if (assertPublicRecipe(recipe) || recipe.authorId === userId || canModerate) return sanitizeRecipe(recipe);

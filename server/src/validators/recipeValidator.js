@@ -74,7 +74,8 @@ export function validateRecipeInput(body, { partial = false } = {}) {
   };
 }
 
-export function validateRecipeQuery(query) {  const page = Number(query.page || 1);
+export function validateRecipeQuery(query) {
+  const page = Number(query.page || 1);
   const limit = Number(query.limit || 20);
   const maxCookTime = query.maxCookTime === undefined ? undefined : Number(query.maxCookTime);
   const tags = query.tags ? String(query.tags).split(',').map((tag) => tag.trim()).filter(Boolean) : undefined;
