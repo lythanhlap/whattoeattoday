@@ -29,7 +29,9 @@
 
   /* Type */
   --font-body: "Inter", "Segoe UI", system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
-  --font-display: "Fraunces", "Iowan Old Style", "Palatino Linotype", "Book Antiqua", Georgia, serif;
+  /* Fallbacks are chosen for Vietnamese: Georgia misses several precomposed
+     glyphs on Windows and renders accents over the wrong base letter. */
+  --font-display: "Fraunces", "Iowan Old Style", "Palatino Linotype", "Book Antiqua", Cambria, "Noto Serif", "Segoe UI", serif;
 
   /* Shape & depth */
   --radius-sm: 10px;
