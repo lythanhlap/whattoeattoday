@@ -7,11 +7,30 @@ function serviceError(message, code, statusCode) {
 
 const recipeSelect = {
   id: true, title: true, slug: true, description: true, coverImageId: true,
-  status: true, visibility: true, category: { select: { name: true, slug: true } },
+  status: true, visibility: true, hiddenAt: true, deletedAt: true,
+  category: { select: { name: true, slug: true } },
+  author: { select: { status: true, deletedAt: true } },
 };
 
+function isAvailable(recipe) {
+  return recipe.status === 'PUBLISHED'
+    && recipe.visibility === 'PUBLIC'
+    && !recipe.hiddenAt
+    && !recipe.deletedAt
+    && recipe.author.status === 'ACTIVE'
+    && !recipe.author.deletedAt;
+}
+
 export async function listBookmarks(userId) {
-  return prisma.bookmark.findMany({ where: { userId }, orderBy: { createdAt: 'desc' }, include: { recipe: { select: recipeSelect }, collection: { select: { id: true, name: true } } } });
+  const rows = await prisma.bookmark.findMany({
+    where: { userId },
+    orderBy: { createdAt: 'desc' },
+    include: { recipe: { select: recipeSelect }, collection: { select: { id: true, name: true } } },
+  });
+  return rows.map((bookmark) => ({
+    ...bookmark,
+    recipe: bookmark.recipe ? { ...bookmark.recipe, available: isAvailable(bookmark.recipe) } : null,
+  }));
 }
 
 export async function addBookmark(userId, recipeId, collectionId) {
@@ -35,6 +54,12 @@ export async function addBookmark(userId, recipeId, collectionId) {
 }
 
 export async function removeBookmark(userId, recipeId) {
-  const deleted = await prisma.bookmark.deleteMany({ where: { userId, recipeId } });
-  if (!deleted.count) throw serviceError('Bookmark not found', 'BOOKMARK_NOT_FOUND', 404);
+  await prisma.$transaction(async (transaction) => {
+    const deleted = await transaction.bookmark.deleteMany({ where: { userId, recipeId } });
+    if (!deleted.count) throw serviceError('Bookmark not found', 'BOOKMARK_NOT_FOUND', 404);
+    await transaction.recipe.updateMany({
+      where: { id: recipeId, saveCount: { gt: 0 } },
+      data: { saveCount: { decrement: 1 } },
+    });
+  });
 }
