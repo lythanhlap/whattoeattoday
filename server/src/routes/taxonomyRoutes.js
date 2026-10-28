@@ -11,8 +11,10 @@ import {
 } from '../controllers/taxonomyController.js';
 import { requireAuth } from '../middlewares/authMiddleware.js';
 import { requireRoles } from '../middlewares/roleMiddleware.js';
+import { requireUuidParam } from '../middlewares/validateParams.js';
 
 export const taxonomyRoutes = Router();
+taxonomyRoutes.param('id', requireUuidParam('id'));
 taxonomyRoutes.get('/categories', listCategoriesController);
 taxonomyRoutes.get('/tags', listTagsController);
 

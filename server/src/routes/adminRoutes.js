@@ -2,8 +2,10 @@ import { Router } from 'express';
 import { adminAuditLogsController, bulkContentActionController, contentActionController, contentDashboardController, contentStatsController, featureRecipeController, listContentController, listUsersController, suspendUserController, updateUserController, warnUserController } from '../controllers/adminController.js';
 import { requireAuth } from '../middlewares/authMiddleware.js';
 import { requireRoles } from '../middlewares/roleMiddleware.js';
+import { requireUuidParam } from '../middlewares/validateParams.js';
 
 export const adminRoutes = Router();
+adminRoutes.param('id', requireUuidParam('id'));
 adminRoutes.use(requireAuth, requireRoles('ADMIN'));
 adminRoutes.get('/users', listUsersController);
 adminRoutes.patch('/users/:id', updateUserController);

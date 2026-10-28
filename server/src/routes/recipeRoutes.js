@@ -3,8 +3,10 @@ import { createRecipeController, deleteRecipeController, getRecipeController, li
 import { requireAuth } from '../middlewares/authMiddleware.js';
 import { optionalAuth } from '../middlewares/optionalAuthMiddleware.js';
 import { rateLimit } from '../middlewares/rateLimit.js';
+import { requireUuidParam } from '../middlewares/validateParams.js';
 
 export const recipeRoutes = Router();
+recipeRoutes.param('id', requireUuidParam('id'));
 
 recipeRoutes.get('/', optionalAuth, listRecipesController);
 recipeRoutes.post('/', requireAuth, createRecipeController);

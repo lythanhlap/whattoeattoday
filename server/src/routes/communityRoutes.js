@@ -7,8 +7,10 @@ import { requireAuth } from '../middlewares/authMiddleware.js';
 import { optionalAuth } from '../middlewares/optionalAuthMiddleware.js';
 import { requireRoles } from '../middlewares/roleMiddleware.js';
 import { rateLimit } from '../middlewares/rateLimit.js';
+import { requireUuidParam } from '../middlewares/validateParams.js';
 
 export const communityRoutes = Router();
+communityRoutes.param('id', requireUuidParam('id'));
 communityRoutes.get('/me/bookmarks', requireAuth, listBookmarksController);
 communityRoutes.patch('/me/profile', requireAuth, updateProfileController);
 communityRoutes.get('/me/collections', requireAuth, listCollectionsController);

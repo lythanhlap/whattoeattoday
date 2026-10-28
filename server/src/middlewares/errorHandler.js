@@ -6,7 +6,8 @@ export function notFoundHandler(request, _response, next) {
 }
 
 export function errorHandler(error, request, response, next) {
-  const statusCode = error.statusCode || 500;
+  const isInvalidIdentifier = error.code === 'P2023';
+  const statusCode = isInvalidIdentifier ? 400 : error.statusCode || 500;
   const isServerError = statusCode >= 500;
 
   void next;
@@ -19,8 +20,16 @@ export function errorHandler(error, request, response, next) {
     data: null,
     meta: {},
     error: {
-      code: error.code || (isServerError ? 'INTERNAL_SERVER_ERROR' : 'REQUEST_ERROR'),
-      message: isServerError ? 'Internal server error' : error.message,
+      code: isInvalidIdentifier
+        ? 'INVALID_IDENTIFIER'
+        : isServerError
+          ? 'INTERNAL_SERVER_ERROR'
+          : error.code || 'REQUEST_ERROR',
+      message: isInvalidIdentifier
+        ? 'Identifier is invalid'
+        : isServerError
+          ? 'Internal server error'
+          : error.message,
       ...(error.details ? { details: error.details } : {}),
     },
   });

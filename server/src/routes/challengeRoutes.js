@@ -4,8 +4,11 @@ import { requireAuth } from '../middlewares/authMiddleware.js';
 import { optionalAuth } from '../middlewares/optionalAuthMiddleware.js';
 import { requireRoles } from '../middlewares/roleMiddleware.js';
 import { rateLimit } from '../middlewares/rateLimit.js';
+import { requireUuidParam } from '../middlewares/validateParams.js';
 
 export const challengeRoutes = Router();
+challengeRoutes.param('id', requireUuidParam('id'));
+challengeRoutes.param('entryId', requireUuidParam('entryId'));
 
 challengeRoutes.get('/', listChallengesController);
 challengeRoutes.get('/:id', optionalAuth, getChallengeController);
