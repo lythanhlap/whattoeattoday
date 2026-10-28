@@ -97,6 +97,18 @@ export const editorialApi = {
   },
   review: (id, input, accessToken) => apiRequest(`/moderation/recipes/${id}/review`, { method: 'POST', accessToken, body: JSON.stringify(input) }),
   feature: (id, featured, accessToken) => apiRequest(`/moderation/recipes/${id}/featured`, { method: 'PATCH', accessToken, body: JSON.stringify({ featured }) }),
+  banners: (params = {}, accessToken) => {
+    const query = new URLSearchParams({ page: String(params.page || 1), limit: String(params.limit || 20), status: params.status || 'all' });
+    if (params.q) query.set('q', params.q);
+    return apiRequest(`/editorial/banners?${query.toString()}`, { accessToken, includeMeta: true });
+  },
+  createBanner: (input, accessToken) => apiRequest('/editorial/banners', { method: 'POST', accessToken, body: JSON.stringify(input) }),
+  updateBanner: (id, input, accessToken) => apiRequest(`/editorial/banners/${id}`, { method: 'PATCH', accessToken, body: JSON.stringify(input) }),
+  deleteBanner: (id, accessToken) => apiRequest(`/editorial/banners/${id}`, { method: 'DELETE', accessToken }),
+};
+
+export const bannerApi = {
+  list: () => apiRequest('/banners'),
 };
 
 export const communityApi = {

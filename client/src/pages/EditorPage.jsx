@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../features/auth/AuthContext.jsx';
 import { EmptyState, ErrorState, LoadingState } from '../features/recipes/RecipeStates.jsx';
-import { editorialApi, taxonomyApi } from '../services/apiClient.js';
+import { editorialApi, taxonomyApi, uploadImageToCloudinary } from '../services/apiClient.js';
 import { useDocumentMeta } from '../lib/useDocumentMeta.js';
 import { optimizedImageUrl } from '../utils/image.js';
 
@@ -32,7 +32,7 @@ export function EditorPage() {
 
   useDocumentMeta({
     title: 'Khu vực biên tập | Bếp Nhà',
-    description: 'Duyệt công thức cộng đồng và quản lý danh mục, tag.',
+    description: 'Duyệt công thức cộng đồng và quản lý danh mục, tag, banner trang chủ.',
     noindex: true,
   });
 
@@ -49,13 +49,217 @@ export function EditorPage() {
   return (
     <section className="editor-page">
       <p className="eyebrow">Biên tập nội dung</p>
-      <h1>Duyệt công thức & quản lý danh mục</h1>
+      <h1>Duyệt công thức & quản lý nội dung biên tập</h1>
       <div className="tab-list" role="tablist" aria-label="Khu vực biên tập">
         <button className={tab === 'review' ? 'tab-button active' : 'tab-button'} type="button" role="tab" aria-selected={tab === 'review'} onClick={() => setTab('review')}>Duyệt công thức</button>
         <button className={tab === 'taxonomy' ? 'tab-button active' : 'tab-button'} type="button" role="tab" aria-selected={tab === 'taxonomy'} onClick={() => setTab('taxonomy')}>Danh mục & tag</button>
+        <button className={tab === 'banners' ? 'tab-button active' : 'tab-button'} type="button" role="tab" aria-selected={tab === 'banners'} onClick={() => setTab('banners')}>Banner trang chủ</button>
       </div>
-      {tab === 'review' ? <ReviewQueue accessToken={accessToken} /> : <TaxonomyManager accessToken={accessToken} />}
+      {tab === 'review' && <ReviewQueue accessToken={accessToken} />}
+      {tab === 'taxonomy' && <TaxonomyManager accessToken={accessToken} />}
+      {tab === 'banners' && <BannerManager accessToken={accessToken} />}
     </section>
+  );
+}
+
+const EMPTY_BANNER_FORM = { title: '', subtitle: '', linkUrl: '', imageId: '', sortOrder: 0, isActive: true, startsAt: '', endsAt: '' };
+
+function toLocalInput(value) {
+  if (!value) return '';
+  const date = new Date(value);
+  return new Date(date.getTime() - date.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
+}
+
+function BannerManager({ accessToken }) {
+  const [state, setState] = useState({ status: 'loading', items: [], meta: null, error: null });
+  const [filter, setFilter] = useState('all');
+  const [form, setForm] = useState(EMPTY_BANNER_FORM);
+  const [editingId, setEditingId] = useState(null);
+  const [preview, setPreview] = useState('');
+  const [upload, setUpload] = useState({ status: 'idle', error: null });
+  const [working, setWorking] = useState(false);
+  const [message, setMessage] = useState(null);
+
+  const load = useCallback(async () => {
+    setState((current) => ({ ...current, status: 'loading', error: null }));
+    try {
+      const result = await editorialApi.banners({ status: filter, limit: 20 }, accessToken);
+      setState({ status: 'success', items: result.data, meta: result.meta, error: null });
+    } catch (error) {
+      setState({ status: 'error', items: [], meta: null, error });
+    }
+  }, [accessToken, filter]);
+
+  useEffect(() => { load(); }, [load]);
+
+  const resetForm = () => {
+    setForm(EMPTY_BANNER_FORM);
+    setEditingId(null);
+    setPreview('');
+    setUpload({ status: 'idle', error: null });
+  };
+
+  const startEdit = (banner) => {
+    setEditingId(banner.id);
+    setForm({
+      title: banner.title,
+      subtitle: banner.subtitle || '',
+      linkUrl: banner.linkUrl || '',
+      imageId: banner.image?.id || '',
+      sortOrder: banner.sortOrder ?? 0,
+      isActive: banner.isActive,
+      startsAt: toLocalInput(banner.startsAt),
+      endsAt: toLocalInput(banner.endsAt),
+    });
+    setPreview(banner.image?.secureUrl || '');
+    setUpload({ status: 'idle', error: null });
+    setMessage(null);
+  };
+
+  const pickImage = async (event) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    setUpload({ status: 'uploading', error: null });
+    try {
+      const uploaded = await uploadImageToCloudinary(file, accessToken, 'banner');
+      setForm((current) => ({ ...current, imageId: uploaded.mediaAssetId }));
+      setPreview(URL.createObjectURL(file));
+      setUpload({ status: 'done', error: null });
+    } catch (error) {
+      setUpload({ status: 'error', error: error.message });
+    }
+  };
+
+  const submit = async (event) => {
+    event.preventDefault();
+    if (!form.imageId) {
+      setMessage({ type: 'error', text: 'Hãy tải lên ảnh banner trước khi lưu.' });
+      return;
+    }
+    const payload = {
+      title: form.title.trim(),
+      subtitle: form.subtitle.trim() || null,
+      linkUrl: form.linkUrl.trim() || null,
+      sortOrder: Number(form.sortOrder) || 0,
+      isActive: form.isActive,
+      startsAt: form.startsAt ? new Date(form.startsAt).toISOString() : null,
+      endsAt: form.endsAt ? new Date(form.endsAt).toISOString() : null,
+      imageId: form.imageId,
+    };
+    setWorking(true);
+    setMessage(null);
+    try {
+      if (editingId) await editorialApi.updateBanner(editingId, payload, accessToken);
+      else await editorialApi.createBanner(payload, accessToken);
+      setMessage({ type: 'success', text: editingId ? 'Đã cập nhật banner.' : 'Đã thêm banner.' });
+      resetForm();
+      await load();
+    } catch (error) {
+      setMessage({ type: 'error', text: error.message });
+    } finally {
+      setWorking(false);
+    }
+  };
+
+  const toggleActive = async (banner) => {
+    setWorking(true);
+    setMessage(null);
+    try {
+      await editorialApi.updateBanner(banner.id, { isActive: !banner.isActive }, accessToken);
+      await load();
+    } catch (error) {
+      setMessage({ type: 'error', text: error.message });
+    } finally {
+      setWorking(false);
+    }
+  };
+
+  const remove = async (banner) => {
+    if (!window.confirm(`Xóa banner "${banner.title}"?`)) return;
+    setWorking(true);
+    setMessage(null);
+    try {
+      await editorialApi.deleteBanner(banner.id, accessToken);
+      setMessage({ type: 'success', text: 'Đã xóa banner.' });
+      if (editingId === banner.id) resetForm();
+      await load();
+    } catch (error) {
+      setMessage({ type: 'error', text: error.message });
+    } finally {
+      setWorking(false);
+    }
+  };
+
+  return (
+    <div className="editor-panel">
+      <div className="editor-toolbar">
+        <label>
+          Trạng thái
+          <select value={filter} onChange={(event) => setFilter(event.target.value)}>
+            <option value="all">Tất cả</option>
+            <option value="active">Đang bật</option>
+            <option value="inactive">Đang tắt</option>
+          </select>
+        </label>
+        <button className="secondary-button" type="button" onClick={load}>Làm mới</button>
+      </div>
+      {message && <p className={message.type === 'error' ? 'form-error' : 'form-success'} role="status">{message.text}</p>}
+
+      <form className="inline-form banner-form" onSubmit={submit}>
+        <h2>{editingId ? 'Sửa banner' : 'Thêm banner'}</h2>
+        <label>Tiêu đề<input required minLength="3" maxLength="120" value={form.title} onChange={(event) => setForm({ ...form, title: event.target.value })} /></label>
+        <label>Mô tả ngắn<input maxLength="240" value={form.subtitle} onChange={(event) => setForm({ ...form, subtitle: event.target.value })} /></label>
+        <label>Liên kết<input maxLength="500" placeholder="/cong-thuc?diet=mon-chay hoặc https://…" value={form.linkUrl} onChange={(event) => setForm({ ...form, linkUrl: event.target.value })} /></label>
+        <label>Thứ tự hiển thị<input type="number" min="0" max="999" value={form.sortOrder} onChange={(event) => setForm({ ...form, sortOrder: event.target.value })} /></label>
+        <label>Bắt đầu<input type="datetime-local" value={form.startsAt} onChange={(event) => setForm({ ...form, startsAt: event.target.value })} /></label>
+        <label>Kết thúc<input type="datetime-local" value={form.endsAt} onChange={(event) => setForm({ ...form, endsAt: event.target.value })} /></label>
+        <label className="checkbox-field"><input type="checkbox" checked={form.isActive} onChange={(event) => setForm({ ...form, isActive: event.target.checked })} />Hiển thị trên trang chủ</label>
+        <label>Ảnh banner<input type="file" accept="image/jpeg,image/png,image/webp" onChange={pickImage} disabled={upload.status === 'uploading'} /></label>
+        {upload.status === 'uploading' && <p className="field-hint">Đang tải ảnh…</p>}
+        {upload.error && <p className="form-error">{upload.error}</p>}
+        {preview && <img className="banner-form-preview" src={preview} alt="Xem trước ảnh banner" loading="lazy" />}
+        <div className="review-action-buttons">
+          <button className="primary-button" type="submit" disabled={working}>{editingId ? 'Lưu thay đổi' : 'Thêm banner'}</button>
+          {editingId && <button className="secondary-button" type="button" onClick={resetForm} disabled={working}>Hủy sửa</button>}
+        </div>
+      </form>
+
+      {state.status === 'loading' && <LoadingState label="Đang tải banner..." />}
+      {state.status === 'error' && <ErrorState error={state.error} onRetry={load} />}
+      {state.status === 'success' && state.items.length === 0 && (
+        <EmptyState title="Chưa có banner">
+          <p>Thêm banner để giới thiệu chủ đề nấu ăn trên trang chủ.</p>
+        </EmptyState>
+      )}
+      {state.status === 'success' && state.items.length > 0 && (
+        <ul className="taxonomy-list banner-list">
+          {state.items.map((banner) => (
+            <li key={banner.id}>
+              <div className="banner-row">
+                {banner.image?.secureUrl
+                  ? <img src={optimizedImageUrl(banner.image.secureUrl, { width: 160, height: 90 })} alt={`Ảnh banner ${banner.title}`} loading="lazy" width="160" height="90" />
+                  : <span className="banner-row-placeholder" aria-hidden="true" />}
+                <div>
+                  <strong>{banner.title}</strong>
+                  <small>Thứ tự {banner.sortOrder} · {banner.isActive ? 'Đang bật' : 'Đang tắt'}</small>
+                  {(banner.startsAt || banner.endsAt) && (
+                    <small>{formatDate(banner.startsAt)} → {formatDate(banner.endsAt)}</small>
+                  )}
+                </div>
+              </div>
+              <div className="taxonomy-actions">
+                <button className="text-button" type="button" disabled={working} onClick={() => toggleActive(banner)}>
+                  {banner.isActive ? 'Tắt' : 'Bật'}
+                </button>
+                <button className="text-button" type="button" disabled={working} onClick={() => startEdit(banner)}>Sửa</button>
+                <button className="icon-button" type="button" aria-label={`Xóa banner ${banner.title}`} disabled={working} onClick={() => remove(banner)}>×</button>
+              </div>
+            </li>
+          ))}
+        </ul>
+      )}
+      {state.meta && <p className="pagination-info">Trang {state.meta.page}/{state.meta.totalPages || 1} · {state.meta.total} banner</p>}
+    </div>
   );
 }
 

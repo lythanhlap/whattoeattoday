@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { RecipeCard } from '../features/recipes/RecipeCard.jsx';
 import { SkeletonGrid } from '../features/recipes/RecipeStates.jsx';
-import { challengeApi, discoveryApi, recipeApi, taxonomyApi } from '../services/apiClient.js';
+import { challengeApi, discoveryApi, recipeApi, taxonomyApi, bannerApi } from '../services/apiClient.js';
 import { useDocumentMeta } from '../lib/useDocumentMeta.js';
 import { optimizedImageUrl } from '../utils/image.js';
 import { Icon } from '../components/Icon.jsx';
@@ -72,6 +72,32 @@ function CategoriesLoader() {
   return taxonomyApi.categories().then((items) => ({ items }));
 }
 
+function BannerLoader() {
+  return bannerApi.list().then((items) => ({ items }));
+}
+
+function BannerCard({ banner }) {
+  const cover = optimizedImageUrl(banner.image?.secureUrl, { width: 900, height: 420 });
+  const body = (
+    <>
+      {cover
+        ? <img src={cover} alt={banner.title} loading="lazy" width="900" height="420" />
+        : <span className="banner-placeholder" aria-hidden="true"><Icon name="sparkles" size={28} /></span>}
+      <span className="banner-copy">
+        <strong>{banner.title}</strong>
+        {banner.subtitle && <span>{banner.subtitle}</span>}
+        {banner.linkUrl && <span className="banner-more">Xem ngay<Icon name="arrow-right" size={15} /></span>}
+      </span>
+    </>
+  );
+
+  if (!banner.linkUrl) return <article className="home-banner">{body}</article>;
+  const external = /^https?:\/\//i.test(banner.linkUrl);
+  return external
+    ? <a className="home-banner" href={banner.linkUrl} target="_blank" rel="noreferrer noopener">{body}</a>
+    : <Link className="home-banner" to={banner.linkUrl}>{body}</Link>;
+}
+
 function RecipeSection({ id, title, subtitle, section, emptyLabel, moreHref, moreLabel = 'Xem tất cả' }) {
   return (
     <section className="home-section" aria-labelledby={id}>
@@ -110,6 +136,7 @@ export function HomePage() {
   const cooksnaps = useSection(CooksnapRecipeLoader);
   const trending = useSection(TrendingLoader);
   const categories = useSection(CategoriesLoader);
+  const banners = useSection(BannerLoader);
   const [searchTerm, setSearchTerm] = useState('');
 
   useDocumentMeta({
@@ -220,6 +247,20 @@ export function HomePage() {
             Tất cả<Icon name="arrow-right" size={15} />
           </Link>
         </nav>
+      )}
+
+      {banners.items.length > 0 && (
+        <section className="home-section home-banners" aria-labelledby="home-banners-title">
+          <div className="home-section-heading">
+            <div>
+              <h2 id="home-banners-title">Góc biên tập</h2>
+              <p>Gợi ý nấu ăn và chủ đề do ban biên tập chọn.</p>
+            </div>
+          </div>
+          <div className="banner-strip">
+            {banners.items.map((banner) => <BannerCard key={banner.id} banner={banner} />)}
+          </div>
+        </section>
       )}
 
       <section className="home-section" aria-labelledby="home-challenges">
