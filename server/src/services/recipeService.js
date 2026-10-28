@@ -308,7 +308,7 @@ export async function updateRecipe(userId, userRole, id, input) {
       await transaction.recipeImage.deleteMany({ where: { recipeId: id } });
       data.images = nestedRecipeData(input).images;
     }
-    if (input.status === undefined && current.status === 'PUBLISHED') data.status = 'PENDING_REVIEW';
+    if (input.status === undefined && current.status === 'PUBLISHED' && !['EDITOR', 'ADMIN'].includes(userRole)) data.status = 'PENDING_REVIEW';
     const recipe = await transaction.recipe.update({ where: { id }, data, include: recipeInclude });
     await attachCoverImage(transaction, input.coverImageId);
     await attachGalleryImages(transaction, input.imageIds);

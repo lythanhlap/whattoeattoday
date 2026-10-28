@@ -106,12 +106,20 @@ test('editor review queue approves a pending recipe and notifies the author', as
   const audit = await request(app).get('/api/v1/admin/audit-logs').set('Authorization', `Bearer ${admin.token}`);
   assert.equal(audit.body.data.some((log) => log.action === 'RECIPE_APPROVED' && log.targetId === recipe.id), true);
 
+  const editorEdit = await request(app).patch(`/api/v1/recipes/${recipe.id}`).set('Authorization', `Bearer ${editor.token}`).send({ description: 'Biên tập viên cập nhật mô tả.' });
+  assert.equal(editorEdit.status, 200);
+  assert.equal(editorEdit.body.data.recipe.status, 'PUBLISHED');
+
   const invalidAction = await request(app).post(`/api/v1/moderation/recipes/${recipe.id}/review`).set('Authorization', `Bearer ${editor.token}`).send({ action: 'PUBLISH_NOW' });
   assert.equal(invalidAction.status, 422);
 
   const alreadyReviewed = await request(app).post(`/api/v1/moderation/recipes/${recipe.id}/review`).set('Authorization', `Bearer ${editor.token}`).send({ action: 'APPROVE' });
   assert.equal(alreadyReviewed.status, 409);
   assert.equal(alreadyReviewed.body.error.code, 'RECIPE_REVIEW_INVALID_STATE');
+
+  const authorEdit = await request(app).patch(`/api/v1/recipes/${recipe.id}`).set('Authorization', `Bearer ${member.token}`).send({ description: 'Tác giả cập nhật mô tả.' });
+  assert.equal(authorEdit.status, 200);
+  assert.equal(authorEdit.body.data.recipe.status, 'PENDING_REVIEW');
 });
 
 test('editor can reject with a note and request changes with a mandatory note', async () => {
