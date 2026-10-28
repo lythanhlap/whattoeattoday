@@ -63,7 +63,7 @@ export async function getProfile(username, viewerId) {
     prisma.collection.findMany({
       where: { ownerId: profile.id, visibility: 'PUBLIC' },
       orderBy: { updatedAt: 'desc' },
-      select: { id: true, name: true, description: true, _count: { select: { bookmarks: true } } },
+      select: { id: true, name: true, description: true, coverImage: { select: { id: true, secureUrl: true, format: true } }, _count: { select: { bookmarks: true } } },
     }),
     viewerId && viewerId !== profile.id ? prisma.follow.findUnique({ where: { followerId_followingId: { followerId: viewerId, followingId: profile.id } }, select: { followerId: true } }) : null,
   ]);

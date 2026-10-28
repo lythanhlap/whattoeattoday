@@ -35,9 +35,22 @@ export async function listCollections(ownerId) {
   return prisma.collection.findMany({ where: { ownerId }, orderBy: { updatedAt: 'desc' }, include: collectionInclude });
 }
 
-export async function getCollection(id, userId) {
-  const base = await prisma.collection.findFirst({ where: { id, OR: [{ visibility: 'PUBLIC' }, ...(userId ? [{ ownerId: userId }] : [])] }, select: { ownerId: true } });
+export async function getCollection(id, userId, userRole) {
+  const isAdmin = userRole === 'ADMIN';
+  const base = await prisma.collection.findFirst({
+    where: {
+      id,
+      ...(isAdmin ? {} : {
+        OR: [
+          ...(userId ? [{ ownerId: userId }] : []),
+          { visibility: 'PUBLIC', owner: { status: 'ACTIVE', deletedAt: null } },
+        ],
+      }),
+    },
+    select: { ownerId: true },
+  });
   if (!base) throw notFound();
+  const canViewAll = isAdmin || base.ownerId === userId;
   return prisma.collection.findUnique({
     where: { id },
     include: {
@@ -45,7 +58,7 @@ export async function getCollection(id, userId) {
       coverImage: { select: { id: true, secureUrl: true, format: true } },
       bookmarks: {
         orderBy: { createdAt: 'desc' },
-        where: base.ownerId === userId ? undefined : { recipe: publicRecipeWhere },
+        where: canViewAll ? undefined : { recipe: publicRecipeWhere },
         include: { recipe: { include: { category: true, author: { select: { id: true, username: true, status: true, profile: { select: { displayName: true } } } } } } },
       },
     },
