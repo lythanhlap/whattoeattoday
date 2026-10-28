@@ -1942,6 +1942,7 @@ fieldset legend {
   max-width: 100%;
 }
 .tab-button {
+  flex: 0 0 auto;
   padding: 0.5rem 1rem;
   border: 0;
   border-radius: var(--radius-pill);
@@ -1949,6 +1950,7 @@ fieldset legend {
   color: var(--ink-soft);
   font-size: 0.86rem;
   font-weight: 550;
+  white-space: nowrap;
   cursor: pointer;
   transition: background 0.18s ease, color 0.18s ease;
 }
