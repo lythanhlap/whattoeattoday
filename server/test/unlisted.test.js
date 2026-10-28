@@ -21,9 +21,19 @@ async function createUser(label) {
 }
 
 after(async () => {
-  for (const id of users) {
-    await prisma.recipe.deleteMany({ where: { authorId: id } });
-    await prisma.user.delete({ where: { id } }).catch(() => {});
+  if (users.length) {
+    // Restrict relations (media, reports, comments, cooksnaps) have to go first,
+    // otherwise the user delete fails silently and leaves fixtures in the dev database.
+    await prisma.report.deleteMany({ where: { OR: [{ reporterId: { in: users } }, { resolvedBy: { in: users } }] } });
+    await prisma.comment.deleteMany({ where: { authorId: { in: users } } });
+    await prisma.cooksnap.deleteMany({ where: { authorId: { in: users } } });
+    await prisma.bookmark.deleteMany({ where: { userId: { in: users } } });
+    await prisma.collection.deleteMany({ where: { ownerId: { in: users } } });
+    await prisma.auditLog.deleteMany({ where: { actorId: { in: users } } });
+    await prisma.challengeEntry.deleteMany({ where: { submittedById: { in: users } } });
+    await prisma.recipe.deleteMany({ where: { authorId: { in: users } } });
+    await prisma.mediaAsset.deleteMany({ where: { ownerId: { in: users } } });
+    await prisma.user.deleteMany({ where: { id: { in: users } } });
   }
   await prisma.$disconnect();
 });
