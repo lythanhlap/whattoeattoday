@@ -73,12 +73,12 @@ export function ModerationPage() {
     } finally { setWorkingUser(null); }
   };
 
-  if (state.status === 'loading') return <LoadingState label="Đang tải hàng đợi moderation..." />;
+  if (state.status === 'loading') return <LoadingState label="Đang tải hàng đợi kiểm duyệt..." />;
   if (state.status === 'error') return <ErrorState error={state.error} onRetry={load} />;
 
   return (
     <section className="moderation-page">
-      <p className="eyebrow">Moderation</p>
+      <p className="eyebrow">Kiểm duyệt</p>
       <h1>Hàng đợi báo cáo</h1>
       {message && <p className={message.type === 'error' ? 'form-error' : 'form-success'} role="status">{message.text}</p>}
       {state.reports.length ? (
@@ -111,8 +111,8 @@ export function ModerationPage() {
       ) : <EmptyState title="Không có báo cáo đang mở"><p>Hàng đợi đã được xử lý.</p></EmptyState>}
       {user?.role === 'ADMIN' && (
         <section className="audit-section">
-          <h2>Audit log gần đây</h2>
-          {auditLogs.length ? <ul className="audit-list">{auditLogs.map((log) => <li key={log.id}><strong>{log.action}</strong><span>{log.actor.username} · {log.targetType}</span></li>)}</ul> : <p>Chưa có audit event.</p>}
+          <h2>Nhật ký hoạt động gần đây</h2>
+          {auditLogs.length ? <ul className="audit-list">{auditLogs.map((log) => <li key={log.id}><strong>{log.action}</strong><span>{log.actor.username} · {log.targetType}</span></li>)}</ul> : <p>Chưa có hoạt động nào được ghi lại.</p>}
         </section>
       )}
     </section>

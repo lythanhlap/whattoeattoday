@@ -4,9 +4,9 @@ export function NotFoundPage() {
   return (
     <section className="page-section" aria-labelledby="not-found-title">
       <p className="eyebrow">404</p>
-      <h1 id="not-found-title">Khong tim thay trang</h1>
-      <p className="lead">Duong dan ban truy cap khong ton tai.</p>
-      <Link className="button-link" to="/">Ve trang chu</Link>
+      <h1 id="not-found-title">Không tìm thấy trang</h1>
+      <p className="lead">Đường dẫn bạn truy cập không tồn tại hoặc nội dung đã được gỡ.</p>
+      <Link className="primary-button button-link" to="/">Về trang chủ</Link>
     </section>
   );
 }

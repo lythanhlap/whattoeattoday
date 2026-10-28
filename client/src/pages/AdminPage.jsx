@@ -30,7 +30,7 @@ export function AdminPage() {
   const { user } = useAuth();
   const [tab, setTab] = useState('accounts');
 
-  useDocumentMeta({ title: 'Quản trị hệ thống | Bếp Nhà', description: 'Quản lý tài khoản, nội dung và audit log.', noindex: true });
+  useDocumentMeta({ title: 'Quản trị hệ thống | Bếp Nhà', description: 'Quản lý tài khoản, nội dung và nhật ký hoạt động.', noindex: true });
 
   if (user?.role !== 'ADMIN') {
     return (
@@ -44,13 +44,13 @@ export function AdminPage() {
 
   return (
     <section className="admin-page">
-      <p className="eyebrow">Administration</p>
+      <p className="eyebrow">Quản trị</p>
       <h1>Quản trị hệ thống</h1>
       <AdminStats />
       <div className="tab-list" role="tablist" aria-label="Khu vực quản trị">
         <button className={tab === 'accounts' ? 'tab-button active' : 'tab-button'} type="button" role="tab" aria-selected={tab === 'accounts'} onClick={() => setTab('accounts')}>Tài khoản</button>
         <button className={tab === 'content' ? 'tab-button active' : 'tab-button'} type="button" role="tab" aria-selected={tab === 'content'} onClick={() => setTab('content')}>Nội dung</button>
-        <button className={tab === 'audit' ? 'tab-button active' : 'tab-button'} type="button" role="tab" aria-selected={tab === 'audit'} onClick={() => setTab('audit')}>Audit log</button>
+        <button className={tab === 'audit' ? 'tab-button active' : 'tab-button'} type="button" role="tab" aria-selected={tab === 'audit'} onClick={() => setTab('audit')}>Nhật ký hoạt động</button>
       </div>
       {tab === 'accounts' && <UserManager />}
       {tab === 'content' && <ContentManager />}
@@ -307,7 +307,7 @@ function AuditLogManager() {
 
   const rows = useMemo(() => state.logs.slice(0, 50), [state.logs]);
 
-  if (state.status === 'loading') return <LoadingState label="Đang tải audit log..." />;
+  if (state.status === 'loading') return <LoadingState label="Đang tải nhật ký hoạt động..." />;
   if (state.status === 'error') return <ErrorState error={state.error} onRetry={load} />;
 
   return (
