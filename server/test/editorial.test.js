@@ -71,6 +71,12 @@ after(async () => {
   await prisma.challengeEntry.deleteMany({ where: { submittedById: { in: users } } });
   await prisma.recipe.deleteMany({ where: { authorId: { in: users } } });
   await prisma.mediaAsset.deleteMany({ where: { ownerId: { in: users } } });
+  // Taxonomy rows created with the per-run suffix must not leak into the dev database
+  // when an assertion fails before the test's own cleanup runs.
+  const runCategories = await prisma.category.findMany({ where: { slug: { endsWith: suffix } }, select: { id: true } });
+  const runTags = await prisma.tag.findMany({ where: { slug: { endsWith: suffix } }, select: { id: true } });
+  await prisma.category.deleteMany({ where: { id: { in: runCategories.map((item) => item.id) } } });
+  await prisma.tag.deleteMany({ where: { id: { in: runTags.map((item) => item.id) } } });
   await prisma.user.deleteMany({ where: { id: { in: users } } });
   await prisma.$disconnect();
 });
