@@ -132,3 +132,35 @@ test('logout revokes the current refresh token', async () => {
   const activeSessions = await prisma.refreshToken.count({ where: { userId, revokedAt: null } });
   assert.equal(activeSessions, 1);
 });
+
+test('logout-all revokes every active session for the user', async () => {
+  const login = await request(app).post('/api/v1/auth/login').send({
+    identifier: testUsername,
+    password: 'correct horse battery staple',
+  });
+
+  assert.equal(login.status, 200);
+  const otherRefreshCookie = login.headers['set-cookie'][0];
+  const otherAccessToken = login.body.data.accessToken;
+  assert.equal(await prisma.refreshToken.count({ where: { userId, revokedAt: null } }), 2);
+
+  const response = await request(app)
+    .post('/api/v1/auth/logout-all')
+    .set('Authorization', `Bearer ${otherAccessToken}`);
+
+  assert.equal(response.status, 200);
+  assert.equal(response.body.data.revokedSessions, 2);
+  assert.equal(await prisma.refreshToken.count({ where: { userId, revokedAt: null } }), 0);
+
+  const refreshResponse = await request(app)
+    .post('/api/v1/auth/refresh')
+    .set('Cookie', otherRefreshCookie);
+
+  assert.equal(refreshResponse.status, 401);
+  assert.equal(refreshResponse.body.error.code, 'INVALID_CREDENTIALS');
+});
+
+test('logout-all requires an authenticated session', async () => {
+  const response = await request(app).post('/api/v1/auth/logout-all');
+  assert.equal(response.status, 401);
+});

@@ -4,6 +4,7 @@ import {
   getRefreshCookieOptions,
   login,
   logout,
+  logoutAll,
   refresh,
   register,
 } from '../services/authService.js';
@@ -63,8 +64,20 @@ export async function logoutController(request, response, next) {
   }
 }
 
-export async function meController(request, response, next) {
+export async function logoutAllController(request, response, next) {
   try {
+    const result = await logoutAll(request.auth.userId);
+    response.clearCookie(env.authCookieName, {
+      ...getRefreshCookieOptions(),
+      maxAge: undefined,
+    });
+    response.status(200).json({ data: result, meta: {}, error: null });
+  } catch (error) {
+    next(error);
+  }
+}
+
+export async function meController(request, response, next) {  try {
     const user = await getCurrentUser(request.auth.userId);
     response.status(200).json({ data: { user }, meta: {}, error: null });
   } catch (error) {

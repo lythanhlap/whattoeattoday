@@ -140,6 +140,14 @@ export async function logout(rawToken) {
   });
 }
 
+export async function logoutAll(userId) {
+  const { count } = await prisma.refreshToken.updateMany({
+    where: { userId, revokedAt: null },
+    data: { revokedAt: new Date() },
+  });
+  return { revokedSessions: count };
+}
+
 export async function getCurrentUser(userId) {
   let user = await prisma.user.findUnique({ where: { id: userId }, select: { ...currentUserSelect, deletedAt: true, suspendedUntil: true } });
   user = await reactivateIfExpired(user);
