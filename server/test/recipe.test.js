@@ -23,6 +23,8 @@ async function createUser(label) {
 
 after(async () => {
   for (const id of users) {
+    await prisma.bookmark.deleteMany({ where: { userId: id } });
+    await prisma.collection.deleteMany({ where: { ownerId: id } });
     await prisma.follow.deleteMany({ where: { OR: [{ followerId: id }, { followingId: id }] } });
     await prisma.report.deleteMany({ where: { OR: [{ reporterId: id }, { recipe: { authorId: id } }, { resolvedBy: id }] } });
     await prisma.comment.deleteMany({ where: { OR: [{ authorId: id }, { recipe: { authorId: id } }] } });
@@ -173,6 +175,7 @@ test('member can bookmark a public recipe and manage a collection', async () => 
   const bookmarks = await request(app).get('/api/v1/me/bookmarks').set('Authorization', `Bearer ${member.token}`);
   assert.equal(bookmarks.status, 200);
   assert.equal(bookmarks.body.data.some((item) => item.recipe.id === created.body.data.recipe.id), true);
+  assert.equal(bookmarks.body.data.find((item) => item.recipe.id === created.body.data.recipe.id).recipe.available, true);
   const duplicate = await request(app).post(`/api/v1/recipes/${created.body.data.recipe.id}/bookmark`).set('Authorization', `Bearer ${member.token}`).send({ collectionId: collection.body.data.collection.id });
   assert.equal(duplicate.status, 201);
   const recipe = await prisma.recipe.findUnique({ where: { id: created.body.data.recipe.id }, select: { saveCount: true } });
@@ -181,6 +184,42 @@ test('member can bookmark a public recipe and manage a collection', async () => 
   assert.equal(removedCollection.status, 204);
   const remainingBookmark = await prisma.bookmark.findUnique({ where: { userId_recipeId: { userId: member.id, recipeId: created.body.data.recipe.id } } });
   assert.equal(remainingBookmark.collectionId, null);
+  const unsaved = await request(app).delete(`/api/v1/recipes/${created.body.data.recipe.id}/bookmark`).set('Authorization', `Bearer ${member.token}`);
+  assert.equal(unsaved.status, 204);
+  const afterRemoval = await prisma.recipe.findUnique({ where: { id: created.body.data.recipe.id }, select: { saveCount: true } });
+  assert.equal(afterRemoval.saveCount, 0);
+  const repeatedRemoval = await request(app).delete(`/api/v1/recipes/${created.body.data.recipe.id}/bookmark`).set('Authorization', `Bearer ${member.token}`);
+  assert.equal(repeatedRemoval.status, 404);
+  const stillZero = await prisma.recipe.findUnique({ where: { id: created.body.data.recipe.id }, select: { saveCount: true } });
+  assert.equal(stillZero.saveCount, 0);
+});
+
+test('admins can inspect private collections and suspended owners hide public ones', async () => {
+  const owner = await createUser('collowner');
+  const admin = await createUser('colladmin');
+  const viewer = await createUser('collviewer');
+  await prisma.user.update({ where: { id: admin.id }, data: { role: 'ADMIN' } });
+
+  const privateCollection = await request(app).post('/api/v1/collections').set('Authorization', `Bearer ${owner.token}`).send({ name: `Bộ riêng tư ${suffix}`, visibility: 'PRIVATE' });
+  assert.equal(privateCollection.status, 201);
+  const privateId = privateCollection.body.data.collection.id;
+
+  const guestView = await request(app).get(`/api/v1/collections/${privateId}`);
+  assert.equal(guestView.status, 404);
+
+  const adminView = await request(app).get(`/api/v1/collections/${privateId}`).set('Authorization', `Bearer ${admin.token}`);
+  assert.equal(adminView.status, 200);
+  assert.equal(adminView.body.data.collection.id, privateId);
+
+  const publicCollection = await request(app).post('/api/v1/collections').set('Authorization', `Bearer ${owner.token}`).send({ name: `Bộ công khai ${suffix}`, visibility: 'PUBLIC' });
+  assert.equal(publicCollection.status, 201);
+  const publicId = publicCollection.body.data.collection.id;
+  const viewerView = await request(app).get(`/api/v1/collections/${publicId}`).set('Authorization', `Bearer ${viewer.token}`);
+  assert.equal(viewerView.status, 200);
+
+  await prisma.user.update({ where: { id: owner.id }, data: { status: 'SUSPENDED' } });
+  const hiddenAfterSuspend = await request(app).get(`/api/v1/collections/${publicId}`).set('Authorization', `Bearer ${viewer.token}`);
+  assert.equal(hiddenAfterSuspend.status, 404);
 });
 
 test('moderator can resolve recipe report and admin can inspect audit log', async () => {
@@ -250,6 +289,26 @@ test('member can create and delete a cooksnap for a public recipe', async () => 
   assert.equal(removed.status, 204);
   const afterRemove = await prisma.recipe.findUnique({ where: { id: created.body.data.recipe.id }, select: { cookSnapCount: true } });
   assert.equal(afterRemove.cookSnapCount, 0);
+});
+
+test('cooksnaps from inactive authors stay hidden even for authenticated viewers', async () => {
+  const author = await createUser('inactiveauthor');
+  const member = await createUser('inactivemember');
+  const viewer = await createUser('inactiveviewer');
+  const created = await request(app).post('/api/v1/recipes').set('Authorization', `Bearer ${author.token}`).send({ title: 'Cooksnap inactive fixture', ingredients: [{ displayName: 'Rau' }], steps: [{ instruction: 'Nấu.' }] });
+  await prisma.recipe.update({ where: { id: created.body.data.recipe.id }, data: { status: 'PUBLISHED', visibility: 'PUBLIC', publishedAt: new Date() } });
+  const snap = await request(app).post(`/api/v1/recipes/${created.body.data.recipe.id}/cooksnaps`).set('Authorization', `Bearer ${member.token}`).send({ imageUrl: 'https://storage.example/inactive-cooksnap.jpg', caption: 'Ảnh của tài khoản bị khóa.' });
+  assert.equal(snap.status, 201);
+
+  await prisma.user.update({ where: { id: member.id }, data: { status: 'SUSPENDED' } });
+
+  const guestList = await request(app).get(`/api/v1/recipes/${created.body.data.recipe.id}/cooksnaps`);
+  assert.equal(guestList.status, 200);
+  assert.equal(guestList.body.data.length, 0);
+
+  const authList = await request(app).get(`/api/v1/recipes/${created.body.data.recipe.id}/cooksnaps`).set('Authorization', `Bearer ${viewer.token}`);
+  assert.equal(authList.status, 200);
+  assert.equal(authList.body.data.length, 0);
 });
 
 test('media signature endpoint is protected and reports missing provider configuration', async () => {
