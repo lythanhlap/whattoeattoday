@@ -156,6 +156,25 @@ test('admin content dashboard hides, restores and bulk moderates every resource 
   assert.equal(audit.body.data.some((log) => log.action === 'CONTENT_HIDE' && log.targetId === recipe.id), true);
 });
 
+test('deleting an already hidden cooksnap does not decrement the counter twice', async () => {
+  const author = await createUser('doubleauthor');
+  const member = await createUser('doublemember');
+  const admin = await createUser('doubleadmin');
+  await prisma.user.update({ where: { id: admin.id }, data: { role: 'ADMIN' } });
+  const recipe = await createPublishedRecipe(author, `Công thức đếm cooksnap ${suffix}`);
+  const cooksnap = await createCooksnap(member, recipe);
+
+  const hidden = await request(app).post(`/api/v1/admin/content/cooksnaps/${cooksnap.id}/action`).set('Authorization', `Bearer ${admin.token}`).send({ action: 'HIDE' });
+  assert.equal(hidden.status, 200);
+  let counter = await prisma.recipe.findUnique({ where: { id: recipe.id }, select: { cookSnapCount: true } });
+  assert.equal(counter.cookSnapCount, 0);
+
+  const removed = await request(app).delete(`/api/v1/cooksnaps/${cooksnap.id}`).set('Authorization', `Bearer ${member.token}`);
+  assert.equal(removed.status, 204);
+  counter = await prisma.recipe.findUnique({ where: { id: recipe.id }, select: { cookSnapCount: true } });
+  assert.equal(counter.cookSnapCount, 0);
+});
+
 test('moderator can warn and temporarily suspend a member with audit trail', async () => {
   const member = await createUser('suspendmember');
   const moderator = await createUser('suspendmod');

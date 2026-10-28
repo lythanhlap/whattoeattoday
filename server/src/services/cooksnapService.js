@@ -4,10 +4,10 @@ import { createNotification } from './notificationService.js';
 function error(message, code, statusCode) { const result = new Error(message); result.code = code; result.statusCode = statusCode; return result; }
 const authorSelect = { id: true, username: true, profile: { select: { displayName: true, avatarUrl: true } } };
 
-export async function listCooksnaps(recipeId, userId) {
+export async function listCooksnaps(recipeId) {
   const recipe = await prisma.recipe.findFirst({ where: { id: recipeId, status: 'PUBLISHED', visibility: 'PUBLIC', deletedAt: null, hiddenAt: null, author: { status: 'ACTIVE', deletedAt: null } }, select: { id: true } });
   if (!recipe) throw error('Recipe not found', 'RECIPE_NOT_FOUND', 404);
-  return prisma.cooksnap.findMany({ where: { recipeId, status: 'ACTIVE', deletedAt: null, ...(userId ? {} : { author: { status: 'ACTIVE', deletedAt: null } }) }, orderBy: { createdAt: 'desc' }, include: { author: { select: authorSelect } } });
+  return prisma.cooksnap.findMany({ where: { recipeId, status: 'ACTIVE', deletedAt: null, author: { status: 'ACTIVE', deletedAt: null } }, orderBy: { createdAt: 'desc' }, include: { author: { select: authorSelect } } });
 }
 
 export async function createCooksnap(authorId, recipeId, input) {
@@ -63,11 +63,14 @@ export async function updateCooksnap(authorId, id, input) {
 }
 
 export async function deleteCooksnap(authorId, id, role) {
-  const cooksnap = await prisma.cooksnap.findUnique({ where: { id }, select: { id: true, authorId: true, recipeId: true, status: true } });
+  const cooksnap = await prisma.cooksnap.findUnique({ where: { id }, select: { id: true, authorId: true, recipeId: true, status: true, deletedAt: true } });
   if (!cooksnap || cooksnap.status === 'DELETED') throw error('Cooksnap not found', 'COOKSNAP_NOT_FOUND', 404);
   if (cooksnap.authorId !== authorId && !['MODERATOR', 'ADMIN'].includes(role)) throw error('You do not have permission to delete this cooksnap', 'FORBIDDEN', 403);
+  const wasActive = cooksnap.status === 'ACTIVE' && !cooksnap.deletedAt;
   return prisma.$transaction(async (transaction) => {
     await transaction.cooksnap.update({ where: { id }, data: { status: 'DELETED', deletedAt: new Date() } });
-    await transaction.recipe.update({ where: { id: cooksnap.recipeId }, data: { cookSnapCount: { decrement: 1 } } });
+    if (wasActive) {
+      await transaction.recipe.updateMany({ where: { id: cooksnap.recipeId, cookSnapCount: { gt: 0 } }, data: { cookSnapCount: { decrement: 1 } } });
+    }
   });
 }
