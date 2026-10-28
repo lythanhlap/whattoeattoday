@@ -1911,6 +1911,8 @@ fieldset legend {
   font-size: 1.9rem;
 }
 .account-header-actions { display: flex; flex-wrap: wrap; gap: 0.5rem; }
+.account-header-actions .secondary-button,
+.account-header-actions .danger-button { white-space: nowrap; }
 .account-header-actions .danger-button { min-height: 2.7rem; }
 
 .account-summary {
@@ -1923,9 +1925,9 @@ fieldset legend {
   background: var(--line);
   overflow: hidden;
 }
-.account-summary > div { padding: 0.9rem 1.1rem; background: var(--card); }
+.account-summary > div { padding: 0.9rem 0.95rem; background: var(--card); }
 .summary-label { display: block; color: var(--muted); font-size: 0.68rem; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; }
-.account-summary strong { display: block; margin-top: 0.15rem; color: var(--ink); font-size: 0.95rem; overflow-wrap: anywhere; }
+.account-summary strong { display: block; margin-top: 0.15rem; color: var(--ink); font-size: 0.92rem; overflow-wrap: break-word; }
 
 .tab-list {
   display: flex;
