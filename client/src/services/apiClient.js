@@ -42,6 +42,7 @@ export const authApi = {
   login: (input) => apiRequest('/auth/login', { method: 'POST', body: JSON.stringify(input) }),
   refresh: () => apiRequest('/auth/refresh', { method: 'POST' }),
   logout: () => apiRequest('/auth/logout', { method: 'POST' }),
+  logoutAll: (accessToken) => apiRequest('/auth/logout-all', { method: 'POST', accessToken }),
   me: (accessToken) => apiRequest('/auth/me', { accessToken }),
   changePassword: (input, accessToken) => apiRequest('/auth/change-password', { method: 'POST', accessToken, body: JSON.stringify(input) }),
 };
@@ -63,6 +64,10 @@ export const recipeApi = {
     return apiRequest(`/recipes?${params.toString()}`, { accessToken, includeMeta: true });
   },
   getBySlug: (slug, accessToken) => apiRequest(`/recipes/${encodeURIComponent(slug)}`, { accessToken }),
+  suggestions: (q, limit = 6, { signal } = {}) => {
+    const params = new URLSearchParams({ q, limit: String(limit) });
+    return apiRequest(`/recipes/suggestions?${params.toString()}`, { signal });
+  },
   create: (input, accessToken) => apiRequest('/recipes', { method: 'POST', accessToken, body: JSON.stringify(input) }),
   update: (id, input, accessToken) => apiRequest(`/recipes/${id}`, { method: 'PATCH', accessToken, body: JSON.stringify(input) }),
   publish: (id, accessToken) => apiRequest(`/recipes/${id}/publish`, { method: 'POST', accessToken }),
@@ -116,7 +121,7 @@ export const communityApi = {
   updateCooksnap: (id, input, accessToken) => apiRequest(`/cooksnaps/${id}`, { method: 'PATCH', accessToken, body: JSON.stringify(input) }),
   deleteCooksnap: (id, accessToken) => apiRequest(`/cooksnaps/${id}`, { method: 'DELETE', accessToken }),
   comments: (recipeId, accessToken) => apiRequest(`/recipes/${recipeId}/comments`, { accessToken }),
-  createComment: (recipeId, content, accessToken) => apiRequest(`/recipes/${recipeId}/comments`, { method: 'POST', accessToken, body: JSON.stringify({ content }) }),
+  createComment: (recipeId, content, accessToken, parentId) => apiRequest(`/recipes/${recipeId}/comments`, { method: 'POST', accessToken, body: JSON.stringify(parentId ? { content, parentId } : { content }) }),
   deleteComment: (id, accessToken) => apiRequest(`/comments/${id}`, { method: 'DELETE', accessToken }),
   follow: (userId, accessToken) => apiRequest(`/users/${userId}/follow`, { method: 'POST', accessToken }),
   unfollow: (userId, accessToken) => apiRequest(`/users/${userId}/follow`, { method: 'DELETE', accessToken }),
