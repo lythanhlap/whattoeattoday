@@ -116,6 +116,7 @@ model User {
   createdChallenges Challenge[] @relation("ChallengeCreator")
   challengeEntries ChallengeEntry[] @relation("ChallengeSubmitter")
   removedChallengeEntries ChallengeEntry[] @relation("ChallengeEntryRemover")
+  banners       Banner[]        @relation("BannerCreator")
 
   @@index([status])
   @@index([role])
@@ -422,10 +423,34 @@ model MediaAsset {
   recipeCovers Recipe[] @relation("RecipeCover")
   recipeImages RecipeImage[]
   collectionCovers Collection[] @relation("CollectionCover")
+  banners Banner[] @relation("BannerImage")
 
   @@index([ownerId, status, createdAt])
   @@index([status, createdAt])
   @@map("media_assets")
+}
+
+model Banner {
+  id          String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  title       String    @db.VarChar(120)
+  subtitle    String?   @db.VarChar(240)
+  linkUrl     String?   @db.VarChar(500)
+  imageId     String    @db.Uuid
+  sortOrder   Int       @default(0)
+  isActive    Boolean   @default(true)
+  startsAt    DateTime?
+  endsAt      DateTime?
+  createdById String    @db.Uuid
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  deletedAt   DateTime?
+
+  image     MediaAsset @relation("BannerImage", fields: [imageId], references: [id], onDelete: Restrict)
+  createdBy User       @relation("BannerCreator", fields: [createdById], references: [id], onDelete: Restrict)
+
+  @@index([isActive, sortOrder])
+  @@index([startsAt, endsAt])
+  @@map("banners")
 }
 
 model Notification {

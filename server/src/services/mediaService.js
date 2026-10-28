@@ -9,6 +9,7 @@ const UPLOAD_FOLDERS = {
   recipe: 'recipes',
   avatar: 'avatars',
   challenge: 'challenges',
+  banner: 'banners',
 };
 
 export async function createUploadSignature(userId, purpose = 'cooksnap') {
@@ -38,7 +39,7 @@ async function getCloudinaryResource(publicId) {
 }
 
 export async function registerUploadedAsset(ownerId, input) {
-  const expectedFolder = new RegExp(`^recipe-community/(cooksnaps|recipes|avatars|challenges)/${ownerId}/`);
+  const expectedFolder = new RegExp(`^recipe-community/(cooksnaps|recipes|avatars|challenges|banners)/${ownerId}/`);
   if (typeof input.publicId !== 'string' || !expectedFolder.test(input.publicId) || typeof input.mediaAssetId !== 'string') { const error = new Error('Upload does not belong to the current user'); error.statusCode = 403; error.code = 'MEDIA_ASSET_FORBIDDEN'; throw error; }
   const resource = await getCloudinaryResource(input.publicId);
   const formats = new Set(['jpg', 'jpeg', 'png', 'webp']);
@@ -69,6 +70,7 @@ export async function cleanupOrphanMediaAssets({ olderThanHours = 24, limit = 10
           recipeCovers: { none: {} },
           recipeImages: { none: {} },
           collectionCovers: { none: {} },
+          banners: { none: {} },
         },
       ],
     },
@@ -87,6 +89,7 @@ export async function cleanupOrphanMediaAssets({ olderThanHours = 24, limit = 10
           recipeCovers: { none: {} },
           recipeImages: { none: {} },
           collectionCovers: { none: {} },
+          banners: { none: {} },
         },
       data: { status: 'CLEANING' },
     });

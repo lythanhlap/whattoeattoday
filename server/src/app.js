@@ -13,6 +13,7 @@ import { mediaRoutes } from './routes/mediaRoutes.js';
 import { notificationRoutes } from './routes/notificationRoutes.js';
 import { challengeRoutes } from './routes/challengeRoutes.js';
 import { discoveryRoutes } from './routes/discoveryRoutes.js';
+import { bannerRoutes } from './routes/bannerRoutes.js';
 import { robotsController, sitemapController, sitemapPageController } from './controllers/seoController.js';
 
 export function createApp() {
@@ -34,6 +35,7 @@ export function createApp() {
   app.use('/api/v1/me/notifications', notificationRoutes);
   app.use('/api/v1/challenges', challengeRoutes);
   app.use('/api/v1', discoveryRoutes);
+  app.use('/api/v1', bannerRoutes);
   app.use(notFoundHandler);
   app.use(errorHandler);
 
